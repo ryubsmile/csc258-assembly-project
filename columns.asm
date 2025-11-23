@@ -466,28 +466,29 @@ clear_marked:
     addi $sp, $sp, -4
     sw   $ra, 0($sp)
     
-    la $t8, ADDR_MARK
-    li $t9, 1024 # bound (0~256 = 256 * 4)
-    li $t0, 0  # i & offset address
+    la $t0, ADDR_MARK     # mark array base address
+    li $t1, 0             # t1 = iterator, i & offset from base address
+    li $t2, 1024          # loop bound (0~256 = 256 * 4)
     clear_marked_loop:
-        beq $t0, $t9, clear_done
-        add $t1, $t8, $t0 # mark address of interest
-        lw $t2, 0($t1)
-        beq $t2, $zero, clear_mark_continue
+        beq $t1, $t2, clear_done # end of loop: exit & end function
+
+        add $t3, $t0, $t1 # address of mark(x, y)
+        lw $t4, 0($t3)    # value of mark(x, y)
+
+        # BRANCH: mark(x, y) == 0 => no mark, continue
+        beq $t4, $zero, clear_mark_continue 
         
-        # clear off single mark
-        sw $zero, 0($t1)
-        # display address of interest
-        add $t3, $s0, $t0 
-        # paint black
-        sw $zero, 0($t3) 
+        # BRANCH: mark(x, y) != 0 => has mark, erase mark + erase gem @ (x, y)
+        sw $zero, 0($t3)  # erase mark
+        add $t5, $s0, $t1 # display address of interest
+        sw $zero, 0($t5)  # paint black
     clear_mark_continue:
-        addi $t0, $t0, 4 # i+=4
+        addi $t1, $t1, 4  # i+=4
         j clear_marked_loop
-    clear_done:
-        lw $ra 0($sp)
-        addi $sp, $sp, 4
-        jr $ra
+clear_done:
+    lw $ra 0($sp)
+    addi $sp, $sp, 4
+    jr $ra
 
     
 # $a0 = x
