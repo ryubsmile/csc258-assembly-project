@@ -757,42 +757,42 @@ new_capsule:
     
     jr   $ra
   
+  
 # draw current capsule
 draw_capsule:
-    addi $sp, $sp, -4
-    sw   $ra, 0($sp)
+    addi $sp, $sp, -16
+    sw   $ra,  0($sp)
+    sw   $s1,  4($sp)
+    sw   $s2,  8($sp)
+    sw   $s3, 12($sp)
+
+    lw   $s1, ADDR_CAPSULE_X       # x column
+    lw   $s2, ADDR_CAPSULE_Y       # bottom y
+    la   $s3, ADDR_CAPSULE_COLORS  # colors
 
     # 1) bottom gem
-    lw   $t0, ADDR_CAPSULE_X       # x column
-    lw   $t1, ADDR_CAPSULE_Y       # bottom y
-    la   $t2, ADDR_CAPSULE_COLORS  # colors
-    move $a0, $t0             # x
-    move $a1, $t1             # y
-    lw   $a2, 0($t2)          # bottom gem color
+    move $a0, $s1             # x
+    move $a1, $s2             # y
+    lw   $a2, 0($s3)          # bottom gem color
     jal add_to_board
 
     # 2) middle gem (y-1)
-    lw   $t0, ADDR_CAPSULE_X       # x column
-    lw   $t1, ADDR_CAPSULE_Y       # bottom y
-    la   $t2, ADDR_CAPSULE_COLORS  # colors
-    addi $t1, $t1, -1
-    move $a0, $t0
-    move $a1, $t1
-    lw   $a2, 4($t2)          # middle gem color
+    move $a0, $s1             # x
+    addi $a1, $s2, -1         # y - 1
+    lw   $a2, 4($s3)          # middle gem color
     jal add_to_board
 
     # 3) top gem (y-2)
-    lw   $t0, ADDR_CAPSULE_X       # x column
-    lw   $t1, ADDR_CAPSULE_Y       # bottom y
-    la   $t2, ADDR_CAPSULE_COLORS  # colors
-    addi $t1, $t1, -2
-    move $a0, $t0
-    move $a1, $t1
-    lw   $a2, 8($t2)          # top gem color
+    move $a0, $s1             # x
+    addi $a1, $s2, -2         # y - 2
+    lw   $a2, 8($s3)          # top gem color
     jal add_to_board
     
-    lw   $ra, 0($sp)
-    addi $sp, $sp, 4
+    lw   $ra,  0($sp)
+    lw   $s1,  4($sp)
+    lw   $s2,  8($sp)
+    lw   $s3, 12($sp)
+    addi $sp, $sp, 16
     jr   $ra
 
     
@@ -800,18 +800,16 @@ draw_capsule:
 # $a1 = y <coord>
 # $a2 = value to inject, is automatically painted.
 add_to_board:
-    lw   $t3, ADDR_DSPL  # load base display address
-
     # address = board base + 4x + 64y
-    sll  $t4, $a0, 2      # t4 = 4x
-    sll  $t5, $a1, 6      # t5 = 64y
-    add  $t1, $t4, $t5    # t1 = offset = 4x + 64y
+    sll  $t0, $a0, 2      # t0 = 4x
+    sll  $t1, $a1, 6      # t1 = 64y
+    add  $t2, $t0, $t1    # t2 = offset = 4x + 64y
     
-    lw   $t3, ADDR_DSPL   # t3 = display base address
-    add  $t3, $s0, $t1    # final display DISPLAY = display_base + offset
+    add  $t3, $s0, $t2    # final display DISPLAY = display_base + offset
     sw   $a2, 0($t3)      # paint display memory-mapped IO
     
     jr   $ra
+
 
 # $a0 = x <coord>
 # $a1 = y <coord>
@@ -822,12 +820,15 @@ get_from_board:
     sll  $t1, $a1, 6      # t1 = 64y
     add  $t2, $t0, $t1    # t2 = offset = 4x + 64y
 
-    add  $t0, $s0, $t2    # t0 = board address of interest
-    lw   $v0, 0($t0)
+    add  $t3, $s0, $t2    # t3 = board address of interest
+    lw   $v0, 0($t3)
     
     jr $ra
     
     
+# draw the outer stage in gray
+# no arguments needed.
+# has inner function calls, stored $ra in stack and returned.
 draw_stage:
     addi $sp, $sp, -4
     sw $ra, 0($sp)
@@ -870,7 +871,7 @@ draw_stage:
     
     lw $ra, 0($sp)
     addi $sp, $sp, 4
-    jr $ra  # end function
+    jr $ra 
 
     
 # $a0 = x <coord> for the starting point of line (+4 = +1 right)
@@ -879,23 +880,21 @@ draw_stage:
 # $a3 = offset (4 = horizontal, 64 = vertical)
 # $s0 = the address of the top left corner
 # $t1 = gray hex code value
-# $t2 = the starting location for the line
-# $t3 = loop stop condition location in 
 draw_line:
     sll $a0, $a0, 2         # multiply the x <coord> in $a0 by 4 to get the horizontal offset
     sll $a1, $a1, 6         # multiply the y <coord> in $a1 by 64 to get the vertical offset
-    add $t0, $a0, $a1       # offset calculated
-    add $t2, $s0, $t0       # add offset to the display address
+    add $t0, $a0, $a1       # offset added
+    add $t0, $s0, $t0       # add offset to the display address
     
     lw $t1, ADDR_STAGE      # load hexcode of gray
     
     # Make a loop to draw a line.
     mul $a2, $a2, $a3      # get the actual offset needed to get to stop cond
-    add $t3, $t2, $a2       # offset from t2 by a2 to find the stop condition
+    add $t3, $t0, $a2       # offset from t0 by a2 to find the stop condition
 loop_start:
-    beq $t3, $t2, loop_end  # check if $t2 has reached the final location of the line
-    sw $t1, 0($t2)          # paint the current pixel to something
-    add $t2, $t2, $a3       # move $t2 to the next pixel in the row.
+    beq $t3, $t0, loop_end  # check if $t0 has reached the final location of the line
+    sw $t1, 0($t0)          # paint the current pixel to something
+    add $t0, $t0, $a3       # move $t0 to the next pixel in the row.
     j loop_start            # jump to the start of the loop
 loop_end:
     jr $ra                  # return to the calling program (ra = return address)
