@@ -285,7 +285,6 @@ respond_to_S:
     # branch CANNOT-MOVE:
     bne $zero, $zero, safe_return
     
-    
     # branch CAN-MOVE:
     # first, erase the current gem
     # 1) bottom gem
@@ -332,7 +331,7 @@ check_collision:
     j handle_collision # branch: collision happened
 
 handle_collision:
-    # check for matches
+    # check for matches and handle them
     jal cascade
     
     # check for possible game end
@@ -355,111 +354,117 @@ create_next_capsule:
     # create new capsule
     jal new_capsule
     jal draw_capsule
-    j safe_return
+    j end_respond_to_S
+
+
+end_respond_to_S:
+safe_return:
+    lw   $ra, 0($sp)
+    addi $sp, $sp, 4
+    jr   $ra
     
+# find match -> erase -> gravity -> find match
 cascade:
-    # find match -> erase -> gravity -> find match
     addi $sp, $sp, -4
     sw   $ra, 0($sp)
 
-cascade_loop:
-    li $v0, 32
-    li $a0, 200
-    syscall # make sleep for every gravity fall
-    
-    jal find_match              # scan board for match, fill up MARKED array
-    beq $v0, $zero, cascade_end # if no match (return = 0), end iteration
-    
-    jal clear_marked            # erase marked array
-    jal apply_gravity           # apply gravity
-    
-    j cascade_loop
+    cascade_loop:
+        li $v0, 32
+        li $a0, 200
+        syscall # make sleep for every gravity fall
+        
+        jal find_match              # scan board for match, fill up MARKED array
+
+        # BRANCH: no match => end iteration
+        beq $v0, $zero, cascade_end 
+
+        # BRANCH: has match => erase marked, apply gravity.
+        #         iterate until there is no match.
+        jal clear_marked   # erase marked array
+        jal apply_gravity  # apply gravity
+        j cascade_loop              
 cascade_end:
-    j safe_return
+    lw   $ra, 0($sp)
+    addi $sp, $sp, 4
+    jr   $ra
     
 
 # v0 = was there a match
 find_match:
-    addi $sp, $sp, -12
-    sw   $ra, 0($sp)
+    addi $sp, $sp, -16
+    sw   $ra,  0($sp) 
+    sw   $s1,  4($sp) # y iterator
+    sw   $s2,  8($sp) # x iterator
+    sw   $s3, 12($sp) # return value accumulator
     
-    li $t0, 1
-    sw   $t0, 4($sp) # y index store
-    sw   $t0, 8($sp) # x index store
+    li $s3, 0 # return value place holder. add up all the counts, and move it into v0 to return
     
-    li $v1, 0 # return value place holder. add up all the counts, and move it into v0 to return
-    li $t9, 15 # bound for iterations
-    li $t0, 1 # y iterator
+    li $s1, 1 # initialize y iterator to 1. loop y = 1 -> 15
     find_match_y_loop:
-        lw $t0, 4($sp)
-        li $t9, 15 # bound for iterations
-        beq $t0, $t9, find_match_end_y_loop
-        li $t1, 1 # x iterator
-        sw $t1, 8($sp)
+        li $t0, 15 # bound for outer loop iterations
+        beq $s1, $t0, find_match_end_loop # end of loop, exit function
+
+        li $s2, 1 # x iterator
         find_match_x_loop:
-            lw $t1, 8($sp)
-            lw $t0, 4($sp)
-            li $t9, 12 # bound for iterations
-            beq $t1, $t9, find_match_end_x_loop
-            move $s6, $t1 # save x value
-            move $s7, $t0 # save y value
+            li $t1, 12 # bound for inner loop iterations
+            beq $s2, $t1, find_match_y_continue # end of loop, continue to next outer loop
             
-            move $a0, $s6 # copy x into a0
-            move $a1, $s7 # copy y into a1 (prepare for the get_from_board args)
-            jal get_from_board # v0 = color @ [a0][a1]
+            # check if there is a gem at (x, y)
+            move $a0, $s2      # copy x into a0
+            move $a1, $s1      # copy y into a1 (prepare for the get_from_board args)
+            jal get_from_board # v0 = color(x, y)
             
-            lw $t8, ADDR_STAGE # hex code for stage
-            beq $v0, $zero, continue_x_loop # if the space is blank, OR
-            beq $v0, $t8, continue_x_loop # if the space is stage filler, continue w/o checking
+            beq $v0, $zero, find_match_x_continue # space == blank, OR
+            lw $t8, ADDR_STAGE                    # (hex code for stage)
+            beq $v0,   $t8, find_match_x_continue # space == stage => no gem, continue w/o checking
             
             # now here, the x, y needs to be checked for each dx dy combo
             # 1) dx = 1, dy = 0 (horizontal)
-            move $a0, $s6 # x
-            move $a1, $s7 # y
+            move $a0, $s2 # x
+            move $a1, $s1 # y
             li $a2, 1     # dx
             li $a3, 0     # dy
             jal check_direction # marking is done inside this
-            add $v1, $v1, $v0
+            add $s3, $s3, $v0
             
             # 2) dx = 1, dy = 1 (diagonal up)
-            move $a0, $s6 # x
-            move $a1, $s7 # y
+            move $a0, $s2 # x
+            move $a1, $s1 # y
             li $a2, 1     # dx
             li $a3, 1     # dy
             jal check_direction # marking is done inside this
-            add $v1, $v1, $v0
+            add $s3, $s3, $v0
             
             # 3) dx = 0, dy = 1 (vertical)
-            move $a0, $s6 # x
-            move $a1, $s7 # y
+            move $a0, $s2 # x
+            move $a1, $s1 # y
             li $a2, 0     # dx
             li $a3, 1     # dy
             jal check_direction # marking is done inside this
-            add $v1, $v1, $v0
+            add $s3, $s3, $v0
             
             # 4) dx = 1, dy = -1 (diagonal down)
-            move $a0, $s6 # x
-            move $a1, $s7 # y
+            move $a0, $s2 # x
+            move $a1, $s1 # y
             li $a2, 1     # dx
             li $a3, -1     # dy
             jal check_direction # marking is done inside this
-            add $v1, $v1, $v0
+            add $s3, $s3, $v0
             
-            continue_x_loop:
-                lw $t1, 8($sp)
-                addi $t1, $t1, 1
-                sw $t1, 8($sp)
-                j find_match_x_loop
-        find_match_end_x_loop:
-            lw $t0, 4($sp)
-            addi $t0, $t0, 1
-            sw $t0, 4($sp)
-            j find_match_y_loop
-    find_match_end_y_loop:
-        move $v0, $v1
-        lw   $ra, 0($sp)
-        addi $sp, $sp, 12
-        jr $ra
+        find_match_x_continue:
+            addi $s2, $s2, 1
+            j find_match_x_loop
+    find_match_y_continue:
+        addi $s1, $s1, 1
+        j find_match_y_loop
+find_match_end_loop:
+    move $v0, $s3
+    lw   $ra,  0($sp)
+    lw   $s1,  4($sp)
+    lw   $s2,  8($sp)
+    lw   $s3, 12($sp)
+    addi $sp, $sp, 16
+    jr $ra
             
 
 clear_marked:
@@ -680,11 +685,6 @@ respond_to_W:
     jal draw_capsule            # update the gem colors
 
     # END respond_to_w
-    lw   $ra, 0($sp)
-    addi $sp, $sp, 4
-    jr   $ra
-
-safe_return:
     lw   $ra, 0($sp)
     addi $sp, $sp, 4
     jr   $ra
