@@ -829,44 +829,43 @@ get_from_board:
     
     
 draw_stage:
-    la $t0, ADDR_DSPL # the top left part of stage
     addi $sp, $sp, -4
     sw $ra, 0($sp)
     
-    addi $a0, $zero, 0
-    addi $a1, $zero, 0
-    addi $a2, $zero, 16
-    addi $a3, $zero, 4
+    la $a0, 0
+    la $a1, 0
+    la $a2, 16
+    la $a3, 4
     jal draw_line # draw top stage : 0,0 to 15,0 
     
-    addi $a0, $zero, 0
-    addi $a1, $zero, 0
-    addi $a2, $zero, 16
-    addi $a3, $zero, 64
+    la $a0, 0
+    la $a1, 0
+    la $a2, 16
+    la $a3, 64
     jal draw_line # draw left stage : 0,0 to 0,15 
     
-    addi $a0, $zero, 11
-    addi $a1, $zero, 0
-    addi $a2, $zero, 16
-    addi $a3, $zero, 64
+    la $a0, 11
+    la $a1, 0
+    la $a2, 16
+    la $a3, 64
     jal draw_line # draw right stage : 8,0 to 8,15 
     
-    addi $a0, $zero, 0
-    addi $a1, $zero, 15
-    addi $a2, $zero, 12
-    addi $a3, $zero, 4
+    la $a0, 0
+    la $a1, 15
+    la $a2, 12
+    la $a3, 4
     jal draw_line # draw bottom stage : 0,15 to 8,15 
     
-    addi $a0, $zero, 15
-    addi $a1, $zero, 0
-    addi $a2, $zero, 4
-    addi $a3, $zero, 64
+    la $a0, 15
+    la $a1, 0
+    la $a2, 4
+    la $a3, 64
     jal draw_line # draw box for next block
     
-    addi $a0, $zero, 12
-    addi $a1, $zero, 4
-    addi $a2, $zero, 4
-    addi $a3, $zero, 4
+    la $a0, 12
+    la $a1, 4
+    la $a2, 4
+    la $a3, 4
     jal draw_line # draw box for next block
     
     lw $ra, 0($sp)
