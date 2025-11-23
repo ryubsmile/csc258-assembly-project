@@ -818,11 +818,11 @@ add_to_board:
 # $v0 = value returned from the board
 get_from_board:
     # address = board base + 4x + 64y
-    sll  $t4, $a0, 2      # t4 = 4x
-    sll  $t5, $a1, 6      # t5 = 64y
-    add  $t1, $t4, $t5    # t1 = offset = 4x + 64y
+    sll  $t0, $a0, 2      # t0 = 4x
+    sll  $t1, $a1, 6      # t1 = 64y
+    add  $t2, $t0, $t1    # t2 = offset = 4x + 64y
 
-    add  $t0, $s0, $t1    # t0 = board address of interest
+    add  $t0, $s0, $t2    # t0 = board address of interest
     lw   $v0, 0($t0)
     
     jr $ra
@@ -883,7 +883,6 @@ draw_stage:
 # $t2 = the starting location for the line
 # $t3 = loop stop condition location in 
 draw_line:
-    
     sll $a0, $a0, 2         # multiply the x <coord> in $a0 by 4 to get the horizontal offset
     sll $a1, $a1, 6         # multiply the y <coord> in $a1 by 64 to get the vertical offset
     add $t0, $a0, $a1       # offset calculated
