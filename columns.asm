@@ -692,18 +692,23 @@ safe_return:
     
 
 # no args needed. returns the hexcode in $v0
+# candidates: [ADDR_COLORS, ADDR_COLORS + 6)
 get_random_gem_color:
+    # make a random color between 0 to 5
     li  $v0, 42          # do random call
     li  $a0, 0           # set lower bound to 0
     li  $a1, 6           # set upper bound to 6 (exclusive)
     syscall              # execute random call in (0, 1, 2, 3, 4, 5), save in $a0
-    la  $t1, ADDR_COLORS # save address of COLORS array in $t1
-    sll $t0, $a0, 2      # t0 = random index * 4 (actual offset in address)
-    add $t1, $t1, $t0    # t1 += t0 (t1 = now index of random color)
-    lw  $v0, 0($t1)      # write (over) t1, 
+
+    la  $t0, ADDR_COLORS # save address of COLORS array in $t0
+    sll $t1, $a0, 2      # t1 = random index * 4 (actual offset in address)
+    add $t2, $t0, $t1    # t2 = t0 + t1 (t2 = index of random color)
+    lw  $v0, 0($t2)      # get random hex code, stored in t2 
     jr  $ra              # return to original line
     
     
+# create a new capsule, initialized at 6,3
+# if there is a gem at 6,3 (and above), end game
 new_capsule:
     addi $sp, $sp, -8
     sw   $ra, 0($sp)
@@ -754,7 +759,7 @@ new_capsule:
     jr   $ra
   
 
-# draw current capsule
+# draw current capsule. 
 draw_capsule:
     addi $sp, $sp, -16
     sw   $ra,  0($sp)
@@ -767,21 +772,21 @@ draw_capsule:
     la   $s3, ADDR_CAPSULE_COLORS  # colors
 
     # 1) bottom gem
-    move $a0, $s1             # x
-    move $a1, $s2             # y
-    lw   $a2, 0($s3)          # bottom gem color
+    move $a0, $s1      # x
+    move $a1, $s2      # y
+    lw   $a2, 0($s3)   # bottom gem color
     jal add_to_board
 
     # 2) middle gem (y-1)
-    move $a0, $s1             # x
-    addi $a1, $s2, -1         # y - 1
-    lw   $a2, 4($s3)          # middle gem color
+    move $a0, $s1      # x
+    addi $a1, $s2, -1  # y - 1
+    lw   $a2, 4($s3)   # middle gem color
     jal add_to_board
 
     # 3) top gem (y-2)
-    move $a0, $s1             # x
-    addi $a1, $s2, -2         # y - 2
-    lw   $a2, 8($s3)          # top gem color
+    move $a0, $s1      # x
+    addi $a1, $s2, -2  # y - 2
+    lw   $a2, 8($s3)   # top gem color
     jal add_to_board
     
     lw   $ra,  0($sp)
