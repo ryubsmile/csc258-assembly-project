@@ -495,91 +495,92 @@ clear_marked:
 # $a2 = dx ( 0, 1, 1, 1)
 # $a3 = dy ( 1, 0, 1,-1)
 check_direction:
-    addi $sp, $sp, -8
-    sw   $ra, 0($sp)
-    li   $t5, 1   # consecutive len = 1 (counter initialized)
-    sw   $t5, 4($sp)
-    
+    addi $sp, $sp, -28
+    sw   $ra,  0($sp)
+    sw   $s1,  4($sp) # x
+    sw   $s2,  8($sp) # y
+    sw   $s3, 12($sp) # dx
+    sw   $s4, 16($sp) # dy
+    sw   $s5, 20($sp) # start color
+    sw   $s6, 24($sp) # consecutive match
+
+    # consecutive match len = 1 (counter initialized)
+    li   $s6, 1
+
     # copy args into s registers 
-    # (will use over the function, 
-    # but no other use outside so did not save to stack)
     move $s1, $a0 #  x
     move $s2, $a1 #  y
     move $s3, $a2 # dx
     move $s4, $a3 # dy
-    
-    # get start color
+
+    # get start color, that is, color(x, y)
     move $a0, $s1 # x
     move $a1, $s2 # y
     jal get_from_board
     move $s5, $v0 # start color
-    
-    # add $t1, $zero, $s2 # set up ny variable
-    
+
     cd_loop:
-        lw $t5, 4($sp)
         # advance to next cell: nx = x + dx, ny = y + dy
         add $s1, $s1, $s3
         add $s2, $s2, $s4
-        
+
         # fetch board color at the next cell
         move $a0, $s1
         move $a1, $s2
         jal get_from_board
         move $t6, $v0 # color at next cell
-        
-        # branch: if same color, increment len and continue
-        beq $s5, $t6, cd_inc_len
-        j cd_end_loop
-        
-    cd_inc_len:
-        lw $t5, 4($sp)
-        addi $t5, $t5, 1
-        sw $t5, 4($sp)
+
+        # BRANCH: start color != end color => end loop
+        bne $s5, $t6, cd_end_loop
+
+        # BRANCH: start color == end color => increment len and continue loop
+        addi $s6, $s6, 1
         j cd_loop
-        
-    cd_end_loop_return_zero:
-        li $v0, 0
-        lw   $ra, 0($sp)
-        addi $sp, $sp, 8
-        jr $ra
+cd_end_loop:
+    # BRANCH: count < 3 => no match. return 0
+    li $t0, 3
+    blt $s6, $t0, cd_end_loop_return_zero 
     
-    cd_end_loop:
-        lw $t5, 4($sp)
-        move $v0, $t5
-        li $t0, 3
-        blt $v0, $t0, cd_end_loop_return_zero # if count is less than 3, return 
+    # BRANCH: count >= 3 => has match. mark the matches
+    move $v0, $s6
+
+    # from (nx, ny), iterate s6 times subtracting dx and dy. add them to mark
+    li $t0, 1 # i = 1
+    marking_loop:
+        bgt $t0, $s6, cd_exit_loop # i == count => end loop, return (do not operate on i = count)
         
-        # from x, y, iterate v0 times to subtracting dx and dy. add it to mark
-        li $t0, 1 # i = 1
-        marking_loop:
-            bgt $t0, $v0, cd_exit_loop # if i = count, return (do not operate on i = count)
-            # x = x - dx * i
-            mul $t1, $s3, $t0  # dx * i
-            mul $t1, $t1, -1   # should go other direction
-            add $t1, $t1, $s1  # + x
-            sll $t1, $t1, 2    # * 4 to get the x offset in bits
-            
-            # y = y + dy * i
-            mul $t2, $s4, $t0 # dy * i
-            mul $t2, $t2, -1  # should go other direction
-            add $t2, $t2, $s2  # + y
-            sll $t2, $t2, 6    # * 64 to get the y offset in bits
-            
-            add $t3, $t1, $t2  # the calculated offset of address
-            
-            la $t4, ADDR_MARK
-            add $t4, $t4, $t3  # mark[nx][ny] address
-            li $t5, 1
-            sw $t5, 0($t4)     # mark[nx][ny] = 1
-            
-            addi $t0, $t0, 1 # increment i
-            j marking_loop
-        
-        cd_exit_loop:
-            lw   $ra, 0($sp)
-            addi $sp, $sp, 8
-            jr $ra
+        # x = x - dx * i
+        mul $t1, $s3, $t0  # dx * i
+        mul $t1, $t1, -1   # should go other direction
+        add $t1, $t1, $s1  # + x
+        sll $t1, $t1, 2    # * 4 to get the x offset in bits
+
+        # y = y - dy * i
+        mul $t2, $s4, $t0  # dy * i
+        mul $t2, $t2, -1   # should go other direction
+        add $t2, $t2, $s2  # + y
+        sll $t2, $t2, 6    # * 64 to get the y offset in bits
+
+        add $t3, $t1, $t2  # the calculated offset of address
+        la $t4, ADDR_MARK  # get mark address
+        add $t4, $t4, $t3  # mark[nx][ny] address
+        li $t5, 1         
+        sw $t5, 0($t4)     # mark[nx][ny] = 1
+
+        addi $t0, $t0, 1 # increment i
+        j marking_loop
+cd_end_loop_return_zero:
+    li $v0, 0
+cd_exit_loop:
+    lw   $ra,  0($sp)
+    lw   $s1,  4($sp)
+    lw   $s2,  8($sp)
+    lw   $s3, 12($sp)
+    lw   $s4, 16($sp)
+    lw   $s5, 20($sp)
+    lw   $s6, 24($sp)
+    addi $sp, $sp, 28
+    jr $ra
 
 
 # find EVERY blocks that are hovering, drop down.
