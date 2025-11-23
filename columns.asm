@@ -582,10 +582,14 @@ check_direction:
             jr $ra
 
 
+# find EVERY blocks that are hovering, drop down.
+# no argument
 apply_gravity:
     addi $sp, $sp, -16
-    sw $ra, 0($sp)
-    sw $s1, 4($sp) # used for x iterator
+    sw $ra,  0($sp)
+    sw $s1,  4($sp) # used for x iterator
+    sw $s2,  8($sp) # used for y iterator
+    sw $s3, 12($sp) # used for ty iterator
 
     # make 200ms sleep for every gravity fall
     li $v0, 32
@@ -593,73 +597,66 @@ apply_gravity:
     syscall 
     
     # loop around x, see if any block is above black blocks
-    li $s1, 12  # set up x loop iterator (decrements from 12 to 0)
+    li $s1, 12 # set up x loop iterator (x = 12 -> 0)
     gravity_x_loop:
-        bltz $s1, gravity_end # at end of loop, end function.
+        bltz $s1, gravity_end # end of loop: end function.
         
-        li $t1, 14  # y = 14 to 0
-        sw $t1, 8($sp)
-    gravity_y_loop:
-        lw $t1, 8($sp)
-        bltz $t1, gravity_x_continue
-        
-        move $a0, $s1 # x
-        move $a1, $t1 # y
-        jal get_from_board
-        move $t2, $v0 # cell color code
-        
-        # branch: if not blank, move on.
-        bne $t2, $zero, gravity_y_continue 
-        # branch: if blank, search for colored blocks upward
-        
-        lw $t1, 8($sp)
-
-        move $t3, $t1 # make a variable for ty (top y), starting from y
-        sw $t3, 12($sp)
-        # loop upwards until meeting (color | ceiling)
-        gravity_search_up:
-            lw $t3, 12($sp)
-            addi $t3, $t3, -1 # ty-- (decrement first)
-            sw $t3, 12($sp)
+        # loop around y, until block is 
+        li $s2, 14 # set up y loop iterator (y = 4 -> 0)
+        gravity_y_loop:
+            bltz $s2, gravity_x_continue # end of loop: next x iteration
             
-            bltz $t3, gravity_y_continue
-            
+            # get the color block for (x, y)
             move $a0, $s1 # x
-            move $a1, $t3 # y
+            move $a1, $s2 # y
             jal get_from_board
+            move $t0, $v0 # cell color code
             
-            move $t4, $v0 # value of board color above
-            # BRANCH: (above == black) -> go even more above
-            beq $t4, $zero, gravity_search_up
-        
-            lw $t6, ADDR_STAGE # hex code value
-            beq $t4, $t6, gravity_x_continue # if it meets a stage, move the x as it reached the top
-        # branch: else, found a block that is hovering
-        # destination = t4
-        lw $t1, 8($sp)
-        move $a0, $s1
-        move $a1, $t1
-        move $a2, $t4
-        jal add_to_board
-        
-        # move down to:
-        lw $t3, 12($sp)
-        move $a0, $s1
-        move $a1, $t3
-        move $a2, $zero
-        jal add_to_board
-    gravity_y_continue:
-        lw $t1, 8($sp)
-        addi $t1, $t1, -1
-        sw $t1, 8($sp)
-        j gravity_y_loop
+            # BRANCH: colored (1st row) => move upwards on until highest ground.
+            bne $t0, $zero, gravity_y_continue 
+
+            # BRANCH: empty => search for colored blocks upward (if there is one)
+            move $s3, $s2 # make a variable for ty (top y), starting from y
+            gravity_search_up: # loop upwards until meeting (color | ceiling)
+                addi $s3, $s3, -1 # ty-- (decrement first)
+                bltz $s3, gravity_x_continue # end of loop: next x iteration
+                
+                # t1 = get color(x, ty)
+                move $a0, $s1 # x
+                move $a1, $s3 # ty
+                jal get_from_board
+                move $t1, $v0 # value of board color above
+                
+                # BRANCH: (above == black) => go even more above
+                beq $t1, $zero, gravity_search_up
+
+            # BRANCH: (above == stage) => next x iteration
+            lw $t2, ADDR_STAGE # hex code value
+            beq $t1, $t2, gravity_x_continue 
+
+            # BRANCH: (above != stage, black) => found a hovering block. drop down
+            # color(x, y) = t1
+            move $a0, $s1
+            move $a1, $s2
+            move $a2, $t1
+            jal add_to_board
+            # color(x, ty) = black
+            move $a0, $s1
+            move $a1, $s3
+            move $a2, $zero
+            jal add_to_board
+        gravity_y_continue:
+            addi $s2, $s2, -1
+            j gravity_y_loop
     gravity_x_continue:
         addi $s1, $s1, -1
         j gravity_x_loop
 gravity_end:
     # END gravity
-    lw $ra, 0($sp)
-    lw $s1, 4($sp)
+    lw $ra,  0($sp)
+    lw $s1,  4($sp)
+    lw $s2,  8($sp)
+    lw $s3, 12($sp)
     addi $sp, $sp, 16
     jr $ra
 
