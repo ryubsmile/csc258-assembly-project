@@ -69,62 +69,36 @@ main:
     # Initialize the game
     lw $s0, ADDR_DSPL # load the display address
     
-    jal draw_stage      # draw the gray stage
+    jal draw_stage
     jal new_capsule
     jal draw_capsule
-       
-    
-    # # --- (3,10) ---
-    # la $t0, ADDR_COLORS
-    # lw $t1, 12($t0)
-    # li $a0, 3
-    # li $a1, 10
-    # move $a2, $t1
-    # jal add_to_board
 
-    # # --- (4,10) ---
-    # la $t0, ADDR_COLORS
-    # lw $t1, 12($t0)
-    # li $a0, 4
-    # li $a1, 10
-    # move $a2, $t1
-    # jal add_to_board
-
-    # # --- (5,10) ---
-    # la $t0, ADDR_COLORS
-    # lw $t1, 12($t0)
-    # li $a0, 5
-    # li $a1, 10
-    # move $a2, $t1
-    # jal add_to_board
-    
-    # li $a0, 3
-    # li $a1, 10
-    # li $a2, 1
-    # li $a3, 0
-    # jal check_direction
-    
+    # Play game
     j game_loop
     
-end_program:
-    li $v0, 10              # terminate the program gracefully
-    syscall
 
 game_loop:
-    # 1a. Check if key has been pressed
     lw $t0, ADDR_KBRD               # $t0 = base address for keyboard
     lw $t8, 0($t0)                  # Load first word from keyboard -> input detector
     beq $t8, 1, keyboard_input      # If first word 1, key is pressed
     
-    # 2a. Check for collisions
-	# 2b. Update locations (capsules)
-	# 3. Draw the screen
-	# 4. Sleep
-
-    # 5. Go back to Step 1
+# time_tick:
+#     li $v0, 32
+#     li $a0, 1000
+#     syscall
+#     jal move_down
     j game_loop
 
-# 1b. Check which key has been pressed
+
+
+
+# terminate the program gracefully
+end_program:
+    li $v0, 10              
+    syscall
+
+
+# check which key has been pressd
 keyboard_input:
     lw $a0, 4($t0)                  # Load second word from keyboard
     beq $a0, 0x71, respond_to_Q     # Check if the key q was pressed
@@ -142,226 +116,222 @@ respond_to_Q:
 
 # move 1 unit left
 respond_to_A:
-    addi $sp, $sp, -4
+    addi $sp, $sp, -12
     sw   $ra, 0($sp)
-   
+    sw   $s1, 4($sp)
+    sw   $s2, 8($sp)
+
+    lw   $s1, ADDR_CAPSULE_X       # x column
+    lw   $s2, ADDR_CAPSULE_Y       # y row bottom
+
     # collision detection
-    lw   $t0, ADDR_CAPSULE_X       # x column
-    lw   $t1, ADDR_CAPSULE_Y       # bottom y
-    addi $a0, $t0, -1
-    addi $a1, $t1, 0               # check if left for bottom is empty
+
+    # check if left for bottom is empty
+    addi $a0, $s1, -1
+    addi $a1, $s2, 0               
     jal get_from_board
-    # branch CANNOT-MOVE:
-    bne $v0, $zero, safe_return 
+    # BRANCH: cannot move => halt movement
+    bne $v0, $zero, end_respond_to_D 
     
-    lw   $t0, ADDR_CAPSULE_X       # x column
-    lw   $t1, ADDR_CAPSULE_Y       # bottom y
-    addi $a0, $t0, -1
-    addi $a1, $t1, -1               # check if left for mid is empty
+    # check if left for mid is empty
+    addi $a0, $s1, -1
+    addi $a1, $s2, -1               
     jal get_from_board
-    # branch CANNOT-MOVE:
-    bne $zero, $zero, safe_return
+    # BRANCH: cannot move => halt movement
+    bne $zero, $zero, end_respond_to_D
     
-    lw   $t0, ADDR_CAPSULE_X       # x column
-    lw   $t1, ADDR_CAPSULE_Y       # bottom y
-    addi $a0, $t0, -1
-    addi $a1, $t1, -2               # check if left for top is empty
+    # check if left for top is empty
+    addi $a0, $s1, -1
+    addi $a1, $s2, -2               
     jal get_from_board
-    # branch CANNOT-MOVE:
-    bne $zero, $zero, safe_return
+    # BRANCH: cannot move => halt movement
+    bne $zero, $zero, end_respond_to_D
     
-    # branch CAN-MOVE:
-    # first, erase the current gem
-    # 1) bottom gem
-    lw   $t0, ADDR_CAPSULE_X       # x column
-    lw   $t1, ADDR_CAPSULE_Y       # bottom y
-    move $a0, $t0                  # x
-    move $a1, $t1                  # y
-    addi $a2, $zero, 0             # color = black as we erase
+    # BRANCH: can move => erase current capsule -> update location -> draw new capsule
+    # 1) erase the current gem
+    # 1-1) bottom gem
+    move $a0, $s1        # x
+    move $a1, $s2        # y
+    la   $a2,   0        # color = black as we erase
+    jal add_to_board
+    # 1-2) middle gem
+    move $a0, $s1        # x
+    addi $a1, $s2, -1    # y
+    la   $a2,   0        # color = black as we erase
+    jal add_to_board
+    # 1-3) top gem
+    move $a0, $s1        # x
+    addi $a1, $s2, -2    # y
+    la   $a2,   0        # color = black as we erase
     jal add_to_board
     
-    # 2) middle gem
-    lw   $t0, ADDR_CAPSULE_X       # x column
-    lw   $t1, ADDR_CAPSULE_Y       # bottom y
-    move $a0, $t0                  # x
-    addi $a1, $t1, -1              # y
-    addi $a2, $zero, 0             # color = black as we erase
-    jal add_to_board
-    
-    # 3) bottom gem
-    lw   $t0, ADDR_CAPSULE_X       # x column
-    lw   $t1, ADDR_CAPSULE_Y       # bottom y
-    move $a0, $t0                  # x
-    addi $a1, $t1, -2              # y
-    addi $a2, $zero, 0             # color = black as we erase
-    jal add_to_board
-    
-    # next, update the gem location (y does not change)
+    # 2) next, update the gem location (y does not change)
     la   $t0, ADDR_CAPSULE_X    # load x address
-    lw   $t1, 0($t0)            # x coord
-    addi $t1, $t1, -1           # x = x - 1
-    sw   $t1, 0($t0)            # update new x value (x = x - 1)
+    lw   $t1, 0($t0)  # x coord
+    addi $t1, $t1, -1  # x = x - 1
+    sw   $t1, 0($t0)  # update new x value (x = x - 1)
     
-    # draw capsule once again
-    # jal check_collision
+    # 3) draw capsule once again
     jal draw_capsule
-    j safe_return
+end_respond_to_A:
+    lw   $ra, 0($sp)
+    lw   $s1, 4($sp)
+    lw   $s2, 8($sp)
+    addi $sp, $sp, 12
+    jr   $ra
  
  
 # move 1 unit right
 respond_to_D:
-    addi $sp, $sp, -4
+    addi $sp, $sp, -12
     sw   $ra, 0($sp)
-    
+    sw   $s1, 4($sp)
+    sw   $s2, 8($sp)
+
+    lw   $s1, ADDR_CAPSULE_X       # x column
+    lw   $s2, ADDR_CAPSULE_Y       # y row bottom
+
     # collision detection
-    lw   $t0, ADDR_CAPSULE_X       # x column
-    lw   $t1, ADDR_CAPSULE_Y       # bottom y
-    addi $a0, $t0, 1
-    addi $a1, $t1, 0               # check if right for bottom is empty
+
+    # check if right for bottom is empty
+    addi $a0, $s1, 1
+    addi $a1, $s2, 0               
     jal get_from_board
-    # branch CANNOT-MOVE:
-    bne $v0, $zero, safe_return 
+    # BRANCH: cannot move => halt movement
+    bne $v0, $zero, end_respond_to_D 
     
-    lw   $t0, ADDR_CAPSULE_X       # x column
-    lw   $t1, ADDR_CAPSULE_Y       # bottom y
-    addi $a0, $t0, 1
-    addi $a1, $t1, -1               # check if right for mid is empty
+    # check if right for mid is empty
+    addi $a0, $s1, 1
+    addi $a1, $s2, -1               
     jal get_from_board
-    # branch CANNOT-MOVE:
-    bne $zero, $zero, safe_return
+    # BRANCH: cannot move => halt movement
+
+    bne $zero, $zero, end_respond_to_D
     
-    lw   $t0, ADDR_CAPSULE_X       # x column
-    lw   $t1, ADDR_CAPSULE_Y       # bottom y
-    addi $a0, $t0, 1
-    addi $a1, $t1, -2               # check if right for top is empty
+    # check if right for top is empty
+    addi $a0, $s1, 1
+    addi $a1, $s2, -2               
     jal get_from_board
-    # branch CANNOT-MOVE:
-    bne $zero, $zero, safe_return
+    # BRANCH: cannot move => halt movement
+    bne $zero, $zero, end_respond_to_D
     
-    # branch CAN-MOVE:
-    # first, erase the current gem
-    # 1) bottom gem
-    lw   $t0, ADDR_CAPSULE_X       # x column
-    lw   $t1, ADDR_CAPSULE_Y       # bottom y
-    move $a0, $t0                  # x
-    move $a1, $t1                  # y
-    addi $a2, $zero, 0             # color = black as we erase
+    # BRANCH: can move => erase current capsule -> update location -> draw new capsule
+    # 1) erase the current gem
+    # 1-1) bottom gem
+    move $a0, $s1        # x
+    move $a1, $s2        # y
+    la   $a2,   0        # color = black as we erase
+    jal add_to_board
+    # 1-2) middle gem
+    move $a0, $s1        # x
+    addi $a1, $s2, -1    # y
+    la   $a2,   0        # color = black as we erase
+    jal add_to_board
+    # 1-3) top gem
+    move $a0, $s1        # x
+    addi $a1, $s2, -2    # y
+    la   $a2,   0        # color = black as we erase
     jal add_to_board
     
-    # 2) middle gem
-    lw   $t0, ADDR_CAPSULE_X       # x column
-    lw   $t1, ADDR_CAPSULE_Y       # bottom y
-    move $a0, $t0                  # x
-    addi $a1, $t1, -1              # y
-    addi $a2, $zero, 0             # color = black as we erase
-    jal add_to_board
-    
-    # 3) top gem
-    lw   $t0, ADDR_CAPSULE_X       # x column
-    lw   $t1, ADDR_CAPSULE_Y       # bottom y
-    move $a0, $t0                  # x
-    addi $a1, $t1, -2              # y
-    addi $a2, $zero, 0             # color = black as we erase
-    jal add_to_board
-    
-    # next, update the gem location (y does not change)
+    # 2) next, update the gem location (y does not change)
     la   $t0, ADDR_CAPSULE_X    # load x address
-    lw   $t1, 0($t0)            # x coord
-    addi $t1, $t1, 1            # x = x + 1
-    sw   $t1, 0($t0)            # update new x value (x = x + 1)
+    lw   $t1, 0($t0)  # x coord
+    addi $t1, $t1, 1  # x = x + 1
+    sw   $t1, 0($t0)  # update new x value (x = x + 1)
     
-    # draw capsule once again
+    # 3) draw capsule once again
     jal draw_capsule
-    j safe_return
+end_respond_to_D:
+    lw   $ra, 0($sp)
+    lw   $s1, 4($sp)
+    lw   $s2, 8($sp)
+    addi $sp, $sp, 12
+    jr   $ra
 
     
 # move 1 unit down
 respond_to_S:
-    addi $sp, $sp, -4
-    sw   $ra, 0($sp)
+move_down:
+    addi $sp, $sp, -16
+    sw   $ra,  0($sp)
+    sw   $s1,  4($sp) # x location
+    sw   $s2,  8($sp) # y location
+    sw   $s3, 12($sp) # loop variable
 
-    # collision detection
-    
-    # branch CANNOT-MOVE:
-    bne $zero, $zero, safe_return
-    
-    # branch CAN-MOVE:
+    lw   $s1, ADDR_CAPSULE_X
+    lw   $s2, ADDR_CAPSULE_Y
+
     # first, erase the current gem
     # 1) bottom gem
-    lw   $t0, ADDR_CAPSULE_X       # x column
-    lw   $t1, ADDR_CAPSULE_Y       # bottom y
-    move $a0, $t0                  # x
-    move $a1, $t1                  # y
-    addi $a2, $zero, 0             # color = black as we erase
+    move $a0, $s1     # x
+    move $a1, $s2     # y
+    li   $a2,   0     # color = black as we erase
     jal add_to_board
     
     # 2) middle gem
-    lw   $t0, ADDR_CAPSULE_X       # x column
-    lw   $t1, ADDR_CAPSULE_Y       # bottom y
-    move $a0, $t0                  # x
-    addi $a1, $t1, -1              # y
-    addi $a2, $zero, 0             # color = black as we erase
+    move $a0, $s1     # x
+    addi $a1, $s2, -1 # y = bottom - 1
+    li   $a2,   0     # color = black as we erase
     jal add_to_board
     
     # 3) bottom gem
-    lw   $t0, ADDR_CAPSULE_X       # x column
-    lw   $t1, ADDR_CAPSULE_Y       # bottom y
-    move $a0, $t0                  # x
-    addi $a1, $t1, -2              # y
-    addi $a2, $zero, 0             # color = black as we erase
+    move $a0, $s1     # x
+    addi $a1, $s2, -2 # y = bottom - 2
+    li   $a2,   0     # color = black as we erase
     jal add_to_board
-    
-    # next, update the gem location (y does not change)
+
+    # next, update the gem location (x does not change)
     la   $t0, ADDR_CAPSULE_Y    # load y address
-    lw   $t1, 0($t0)            # y coord
-    addi $t1, $t1, 1            # y = y + 1
+    addi $t1, $s2, 1            # ny = y + 1
     sw   $t1, 0($t0)            # update new y value (y = y + 1)
     
+    lw   $s2, ADDR_CAPSULE_Y    # update new y value
+
     # draw capsule once again
     jal draw_capsule
 
-check_collision:
-    # if capsule meets bottom, make a new capsule
-    lw  $a0, ADDR_CAPSULE_X
-    lw  $a1, ADDR_CAPSULE_Y
-    addi $a1, $a1, 1
+    # capsule location updated (1 down), now check for collision.
+
+    # get bottom = color(x, y + 1)
+    move $a0, $s1
+    addi $a1, $s2, 1
     jal get_from_board
     
-    beq $v0, $zero, safe_return # branch: bottom is black == empty, no collision
-    j handle_collision # branch: collision happened
+    # BRANCH: bottom == empty => no collision, end response
+    beq $v0, $zero, end_respond_to_S 
 
-handle_collision:
-    # check for matches and handle them
-    jal cascade
+    # BRANCH: bottom != empty => reached ground, check for matches and handle
+    jal cascade # check for matches and handle them
     
     # check for possible game end
-    # check if (1, 1) ~ (12, 1) is occupied.
-    # additionally check if (6, 2), (6,3) is occupied. if any, game end.
-    li $s7, 1
-    check_end_loop:
+    # check if (1, 1) ~ (10, 1) is occupied.
+    li $s3, 1
+    check_game_over_loop:
         li $t0, 11
-        beq $s7, $t0, create_next_capsule # passing (reaching the end of loop) means game continues
+        beq $s3, $t0, check_game_over_end_loop # BRANCH: end of loop => game continues
         
-        move $a0, $s7
+        move $a0, $s3
         li $a1, 2 
         jal get_from_board
-        bne $v0, $zero, end_program # if the cell is not zero, it reached the top
-    
-        addi $s7, $s7, 1
-        j check_end_loop
 
-create_next_capsule:
-    # create new capsule
-    jal new_capsule
-    jal draw_capsule
-    j end_respond_to_S
+        # BRANCH: (nx, ny) != zero => the gem reached the top, game over.
+        bne $v0, $zero, end_program 
 
-
+        # BRANCH: (nx, ny) == zero => the top is empty, continue for other checks
+        addi $s3, $s3, 1
+        j check_game_over_loop
+    check_game_over_end_loop:
+        # create new capsule
+        jal new_capsule
+        jal draw_capsule
 end_respond_to_S:
-safe_return:
-    lw   $ra, 0($sp)
-    addi $sp, $sp, 4
+    lw   $ra,  0($sp)
+    lw   $s1,  4($sp)
+    lw   $s2,  8($sp)
+    lw   $s3, 12($sp)
+    addi $sp, $sp, 16
     jr   $ra
+
     
 # find match -> erase -> gravity -> find match
 cascade:
