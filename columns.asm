@@ -692,7 +692,7 @@ safe_return:
     
 
 # no args needed. returns the hexcode in $v0
-return_random_color:
+get_random_gem_color:
     li  $v0, 42          # do random call
     li  $a0, 0           # set lower bound to 0
     li  $a1, 6           # set upper bound to 6 (exclusive)
@@ -705,59 +705,55 @@ return_random_color:
     
     
 new_capsule:
-    addi $sp, $sp, -4
+    addi $sp, $sp, -8
     sw   $ra, 0($sp)
+    sw   $s1, 4($sp)
+
+    # coordinate for next top
+    addi $s1, $s0, 116
     
-    li $a0, 6
-    li $a1, 2
-    jal get_from_board
-    bne $v0, $zero, end_program
+    # check if (6,3) is already painted. in case, end game.
     li $a0, 6
     li $a1, 3
     jal get_from_board
     bne $v0, $zero, end_program
     
-    addi $t4, $s0, 116    # coordinate for next top
+    # upcoming color hex values 
+    # (fetch from next capsule and store in ADDR_CAPSULE_COLORS)
+    la   $t0, ADDR_CAPSULE_COLORS # load color address
+    lw   $t1, 128($s1) 
+    sw   $t1,   0($t0) # load color from next bot and save at current bot
+    lw   $t2,  64($s1) 
+    sw   $t2,   4($t0) # load color from next mid and save at current mid
+    lw   $t3,   0($s1) 
+    sw   $t3,   8($t0) # load color from next top and save at current top
     
-    # upcoming color hex values (should be stored in ADDR_CAPSULE_COLORS)
-    lw   $t7,   0($t4)    # color in next top 
-    lw   $t8,  64($t4)    # color in next mid 
-    lw   $t9, 128($t4)    # color in next bot 
+    # generate and save random color at next capsule viewer
+    jal  get_random_gem_color
+    sw   $v0,   0($s1)        # save at next top
+    jal  get_random_gem_color
+    sw   $v0,  64($s1)        # save at next mid
+    jal  get_random_gem_color
+    sw   $v0, 128($s1)        # save at next bot
     
-    la   $t0, ADDR_CAPSULE_COLORS
-    sw   $t7, 8($t0)      # save at current top
-    sw   $t8, 4($t0)      # save at current mid
-    sw   $t9, 0($t0)      # save at current bot
-    
-    jal  return_random_color    # random color for bot
-    addi $t4, $s0, 116          # coordinate for next top
-    sw   $v0, 128($t4)          # save at next bot
-    
-    jal  return_random_color
-    addi $t4, $s0, 116          # coordinate for next top
-    sw   $v0, 64($t4)           # save at next mid
-    
-    jal  return_random_color
-    addi $t4, $s0, 116          # coordinate for next top
-    sw   $v0, 0($t4)            # save at next top
-    
-    la   $t0, ADDR_CAPSULE_X    # load x address
-    li $t1, 6          # put in 6 (starting x coord)
-    sw   $t1, 0($t0)
-    
-    la   $t2, ADDR_CAPSULE_Y    # load y address
-    li $t3, 3          # put in 3 (starting y coord)
-    sw   $t3, 0($t2)
+    # set (x, y) of new capsule to (6, 3)
+    la   $t0, ADDR_CAPSULE_X  # load x address
+    li   $t1, 6               # put in 6 (starting x coord)
+    sw   $t1, 0($t0)          # save to ADDR_CAPSULE_X
+    la   $t2, ADDR_CAPSULE_Y  # load y address
+    li   $t3, 3               # put in 3 (starting y coord)
+    sw   $t3, 0($t2)          # save to ADDR_CAPSULE_Y
     
     lw   $ra, 0($sp)
-    addi $sp, $sp, 4
+    lw   $s1, 4($sp)
+    addi $sp, $sp, 8
     
     lw   $t0, ADDR_CAPSULE_COLORS   # load first color in capsule (bot)
     beq  $t0, $zero, new_capsule    # if black, needs another round of this
     
     jr   $ra
   
-  
+
 # draw current capsule
 draw_capsule:
     addi $sp, $sp, -16
@@ -833,40 +829,40 @@ draw_stage:
     addi $sp, $sp, -4
     sw $ra, 0($sp)
     
-    la $a0, 0
-    la $a1, 0
-    la $a2, 16
-    la $a3, 4
+    li $a0, 0
+    li $a1, 0
+    li $a2, 16
+    li $a3, 4
     jal draw_line # draw top stage : 0,0 to 15,0 
     
-    la $a0, 0
-    la $a1, 0
-    la $a2, 16
-    la $a3, 64
+    li $a0, 0
+    li $a1, 0
+    li $a2, 16
+    li $a3, 64
     jal draw_line # draw left stage : 0,0 to 0,15 
     
-    la $a0, 11
-    la $a1, 0
-    la $a2, 16
-    la $a3, 64
+    li $a0, 11
+    li $a1, 0
+    li $a2, 16
+    li $a3, 64
     jal draw_line # draw right stage : 8,0 to 8,15 
     
-    la $a0, 0
-    la $a1, 15
-    la $a2, 12
-    la $a3, 4
+    li $a0, 0
+    li $a1, 15
+    li $a2, 12
+    li $a3, 4
     jal draw_line # draw bottom stage : 0,15 to 8,15 
     
-    la $a0, 15
-    la $a1, 0
-    la $a2, 4
-    la $a3, 64
+    li $a0, 15
+    li $a1, 0
+    li $a2, 4
+    li $a3, 64
     jal draw_line # draw box for next block
     
-    la $a0, 12
-    la $a1, 4
-    la $a2, 4
-    la $a3, 4
+    li $a0, 12
+    li $a1, 4
+    li $a2, 4
+    li $a3, 4
     jal draw_line # draw box for next block
     
     lw $ra, 0($sp)
