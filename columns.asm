@@ -54,6 +54,12 @@ ADDR_CAPSULE_Y:
 ADDR_MARK:
     .word 0:256
 
+ADDR_LAST_KEY:
+    .word -1
+
+PAUSED:
+    .word 0
+
 ##############################################################################
 # Mutable Data
 ##############################################################################
@@ -78,18 +84,22 @@ main:
     
 
 game_loop:
-    lw $t0, ADDR_KBRD               # $t0 = base address for keyboard
-    lw $t8, 0($t0)                  # Load first word from keyboard -> input detector
-    beq $t8, 1, keyboard_input      # If first word 1, key is pressed
+    # lw $t0, ADDR_KBRD               # $t0 = base address for keyboard
+    # lw $t8, 0($t0)                  # Load first word from keyboard -> input detector
+    # beq $t8, 1, keyboard_input      # If first word 1, key is pressed
     
-# time_tick:
-#     li $v0, 32
-#     li $a0, 1000
-#     syscall
-#     jal move_down
+    # BRANCH: PAUSED != 0 meaning true, do nothing.
+    lw $t0, PAUSED
+    bne $t0, $zero, game_loop
+    # BRANCH: PAUSED == 0 meaning continue game
+
+    # MILESTONE 4/5: Easy-1
+    li $v0, 32
+    li $a0, 1000
+    syscall
+    jal move_down
+
     j game_loop
-
-
 
 
 # terminate the program gracefully
@@ -100,7 +110,16 @@ end_program:
 
 # check which key has been pressd
 keyboard_input:
+    lw $t0, ADDR_KBRD               # $t0 = base address for keyboard
     lw $a0, 4($t0)                  # Load second word from keyboard
+
+    beq $a0, 0x70, respond_to_P     # Check if the key p was pressed
+
+    # BRANCH: PAUSED != 0 meaning true, do nothing.
+    lw $t0, PAUSED
+    bne $t0, $zero, game_loop
+    # BRANCH: PAUSED == 0 meaning continue game
+
     beq $a0, 0x71, respond_to_Q     # Check if the key q was pressed
     beq $a0, 0x61, respond_to_A     # Check if the key a was pressed
     beq $a0, 0x64, respond_to_D     # Check if the key a was pressed
@@ -109,9 +128,34 @@ keyboard_input:
     
     j game_loop
 
+
 # INPUT MAPPERS
 respond_to_Q:
     j end_program
+
+
+# MILESTONE 4/5: Easy-6
+# handle toggle PAUSED
+respond_to_P:
+    la $t0, PAUSED
+    # load PAUSED
+    lw $t1, 0($t0)
+
+    # toggle PAUSED. 0 <-> 1 (0 * -1 + 1 = 1, 1 * -1 + 1 = 0)
+    li $t2, -1
+    mul $t3, $t1, $t2
+    addi $t3, $t3, 1
+
+    # update PAUSED
+    sw $t3, 0($t0)
+
+    beq $t3, $zero, P_is_zero
+P_is_one:
+    jal display_pause
+    j game_loop
+P_is_zero:
+    jal hide_pause
+    j game_loop
     
 
 # move 1 unit left
@@ -692,6 +736,7 @@ new_capsule:
     jal get_from_board
     bne $v0, $zero, end_program
     
+    # MILESTONE 4/5: Easy-10
     # upcoming color hex values 
     # (fetch from next capsule and store in ADDR_CAPSULE_COLORS)
     la   $t0, ADDR_CAPSULE_COLORS # load color address
@@ -802,6 +847,8 @@ get_from_board:
 draw_stage:
     addi $sp, $sp, -4
     sw $ra, 0($sp)
+
+    lw $t1, ADDR_STAGE      # load hexcode of gray
     
     li $a0, 0
     li $a1, 0
@@ -843,6 +890,49 @@ draw_stage:
     addi $sp, $sp, 4
     jr $ra 
 
+
+# display P at the bottom right corner to indicate paused state
+display_pause:
+    addi $sp, $sp, -4
+    sw $ra, 0($sp)
+    
+    la $t0, ADDR_COLORS
+    lw $t1, 20($t0)
+    j draw_p
+hide_pause:
+    addi $sp, $sp, -4
+    sw $ra, 0($sp)
+    
+    li $t1, 0
+draw_p:
+    li $a0, 12
+    li $a1, 11
+    li $a2,  5
+    li $a3, 64
+    jal draw_line 
+
+    li $a0, 12
+    li $a1, 11
+    li $a2,  3
+    li $a3,  4
+    jal draw_line
+
+    li $a0, 12
+    li $a1, 13
+    li $a2,  3
+    li $a3,  4
+    jal draw_line
+
+    li $a0, 15
+    li $a1, 12
+    li $a2,  1
+    li $a3,  4
+    jal draw_line
+    
+    lw $ra, 0($sp)
+    addi $sp, $sp, 4
+    jr $ra 
+
     
 # $a0 = x <coord> for the starting point of line (+4 = +1 right)
 # $a1 = y <coord> for the starting point of line (+64 = +1 down)
@@ -856,16 +946,14 @@ draw_line:
     add $t0, $a0, $a1       # offset added
     add $t0, $s0, $t0       # add offset to the display address
     
-    lw $t1, ADDR_STAGE      # load hexcode of gray
-    
     # Make a loop to draw a line.
-    mul $a2, $a2, $a3      # get the actual offset needed to get to stop cond
+    mul $a2, $a2, $a3       # get the actual offset needed to get to stop cond
     add $t3, $t0, $a2       # offset from t0 by a2 to find the stop condition
-loop_start:
-    beq $t3, $t0, loop_end  # check if $t0 has reached the final location of the line
+draw_line_loop:
+    beq $t3, $t0, draw_line_end_loop  # check if $t0 has reached the final location of the line
     sw $t1, 0($t0)          # paint the current pixel to something
     add $t0, $t0, $a3       # move $t0 to the next pixel in the row.
-    j loop_start            # jump to the start of the loop
-loop_end:
+    j draw_line_loop        # jump to the start of the loop
+draw_line_end_loop:
     jr $ra                  # return to the calling program (ra = return address)
     
