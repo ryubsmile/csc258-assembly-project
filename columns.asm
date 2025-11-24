@@ -76,6 +76,8 @@ PAUSED:
 main:
     # Initialize the game
     lw $s0, ADDR_DSPL # load the display address
+    
+    jal paint_black
 
     # jal display_game_over
     # j main
@@ -115,6 +117,21 @@ sleep_one_frame:
     # BRANCH: PAUSED == 0 meaning continue game
 
     j game_loop
+
+
+game_over:
+    jal paint_black
+game_over_loop:
+    jal display_game_over
+    li $v0, 32
+    li $a0, 400 
+    syscall
+    jal cascade
+    lw $t0, ADDR_KBRD               # $t0 = base address for keyboard
+    lw $a0, 4($t0)
+    beq $a0, 0x70, main
+    
+    j game_over_loop
 
 
 # terminate the program gracefully
@@ -376,7 +393,7 @@ move_down:
         jal get_from_board
 
         # BRANCH: (nx, ny) != zero => the gem reached the top, game over.
-        bne $v0, $zero, end_program 
+        bne $v0, $zero, game_over 
 
         # BRANCH: (nx, ny) == zero => the top is empty, continue for other checks
         addi $s3, $s3, 1
@@ -751,7 +768,7 @@ new_capsule:
     li $a0, 6
     li $a1, 3
     jal get_from_board
-    bne $v0, $zero, end_program
+    bne $v0, $zero, game_over
     
     # MILESTONE 4/5: Easy-10
     # upcoming color hex values 
@@ -908,6 +925,24 @@ draw_stage:
     jr $ra 
 
 
+paint_black:
+    addi $sp, $sp, -4
+    sw   $ra, 0($sp)
+    
+    li $t1, 0             # t1 = iterator, i & offset from base address
+    li $t2, 2048          # loop bound (0~512 = 512 * 4)
+    paint_black_loop:
+        beq $t1, $t2, paint_black_done # end of loop: exit & end function
+        add $t5, $s0, $t1 # display address of interest
+        sw $zero, 0($t5)  # paint black
+        addi $t1, $t1, 4  # i+=4
+        j paint_black_loop
+paint_black_done:
+    lw $ra 0($sp)
+    addi $sp, $sp, 4
+    jr $ra
+
+
 # display P at the bottom right corner to indicate paused state
 display_pause:
     addi $sp, $sp, -4
@@ -977,8 +1012,8 @@ display_game_over:
     jal draw_line     # bottom
     li $a0,2
     li $a1,2
-    li $a2,1
-    li $a3,4
+    li $a2,2
+    li $a3,128
     jal draw_line     # inside
 
     ############################################################
@@ -1155,11 +1190,200 @@ display_game_over:
     li $a3,4
     jal draw_line    # right mid pixel
 
+    # # R to RETRY
+    # # ===========================
+    # # draw R to retry (2 lines)
+    # # ===========================
+
+    # # ===========================
+    # # LINE 1: "R to"  (y = 5)
+    # # ===========================
+
+    # # --- Letter R (x=15, y=5) ---
+    # li $a0, 15
+    # li $a1, 5
+    # li $a2, 3   # top bar length
+    # li $a3, 4
+    # jal draw_line
+
+    # li $a0, 15
+    # li $a1, 5
+    # li $a2, 5   # left vertical
+    # li $a3, 128
+    # jal draw_line
+
+    # li $a0, 17
+    # li $a1, 5
+    # li $a2, 2   # right top vertical
+    # li $a3, 128
+    # jal draw_line
+
+    # li $a0, 15
+    # li $a1, 7
+    # li $a2, 3   # middle horizontal
+    # li $a3, 4
+    # jal draw_line
+
+    # li $a0, 16
+    # li $a1, 7
+    # li $a2, 3   # diagonal down right
+    # li $a3, 132   # 128+4
+    # jal draw_line
+
+    # # --- Letter t (x=19, y=5) ---
+    # li $a0, 20
+    # li $a1, 5
+    # li $a2, 1   # top pixel
+    # li $a3, 4
+    # jal draw_line
+
+    # li $a0, 19
+    # li $a1, 6
+    # li $a2, 3   # horizontal bar
+    # li $a3, 4
+    # jal draw_line
+
+    # li $a0, 20
+    # li $a1, 6
+    # li $a2, 4   # vertical
+    # li $a3, 128
+    # jal draw_line
+
+    # # --- Letter o (x=23, y=5) ---
+    # li $a0, 23
+    # li $a1, 5
+    # li $a2, 3   # top
+    # li $a3, 4
+    # jal draw_line
+
+    # li $a0, 23
+    # li $a1, 9
+    # li $a2, 3   # bottom
+    # li $a3, 4
+    # jal draw_line
+
+    # li $a0, 23
+    # li $a1, 5
+    # li $a2, 5   # left vertical
+    # li $a3, 128
+    # jal draw_line
+
+    # li $a0, 25
+    # li $a1, 5
+    # li $a2, 5   # right vertical
+    # li $a3, 128
+    # jal draw_line
+
+    # # ===========================
+    # # LINE 2: "retry"  (y = 11)
+    # # ===========================
+
+    # # --- Letter r (x=15, y=11) ---
+    # li $a0, 15
+    # li $a1, 11
+    # li $a2, 2   # top bar
+    # li $a3, 4
+    # jal draw_line
+
+    # li $a0, 15
+    # li $a1, 11
+    # li $a2, 5   # left vertical
+    # li $a3, 128
+    # jal draw_line
+
+    # li $a0, 16
+    # li $a1, 12
+    # li $a2, 1   # middle right
+    # li $a3, 4
+    # jal draw_line
+
+    # # --- Letter e (x=18, y=11) ---
+    # li $a0, 18
+    # li $a1, 11
+    # li $a2, 3   # top
+    # li $a3, 4
+    # jal draw_line
+
+    # li $a0, 18
+    # li $a1, 13
+    # li $a2, 3   # middle
+    # li $a3, 4
+    # jal draw_line
+
+    # li $a0, 18
+    # li $a1, 15
+    # li $a2, 3   # bottom
+    # li $a3, 4
+    # jal draw_line
+
+    # li $a0, 18
+    # li $a1, 11
+    # li $a2, 5   # left vertical
+    # li $a3, 128
+    # jal draw_line
+
+    # # --- Letter t (x=22, y=11) ---
+    # li $a0, 23
+    # li $a1, 11
+    # li $a2, 1   # top
+    # li $a3, 4
+    # jal draw_line
+
+    # li $a0, 22
+    # li $a1, 12
+    # li $a2, 3   # horizontal bar
+    # li $a3, 4
+    # jal draw_line
+
+    # li $a0, 23
+    # li $a1, 12
+    # li $a2, 4   # vertical
+    # li $a3, 128
+    # jal draw_line
+
+    # # --- Letter r (x=26, y=11) ---
+    # li $a0, 26
+    # li $a1, 11
+    # li $a2, 2
+    # li $a3, 4
+    # jal draw_line
+
+    # li $a0, 26
+    # li $a1, 11
+    # li $a2, 5
+    # li $a3, 128
+    # jal draw_line
+
+    # li $a0, 27
+    # li $a1, 12
+    # li $a2, 1
+    # li $a3, 4
+    # jal draw_line
+
+    # # --- Letter y (x=29, y=11) ---
+    # li $a0, 29
+    # li $a1, 11
+    # li $a2, 1
+    # li $a3, 4
+    # jal draw_line
+
+    # li $a0, 29
+    # li $a1, 12
+    # li $a2, 3
+    # li $a3, 132  # diagonal down right
+    # jal draw_line
+
+    # li $a0, 31
+    # li $a1, 14
+    # li $a2, 2
+    # li $a3, 128
+    # jal draw_line
+
 
     lw $ra, 0($sp)
     addi $sp, $sp, 4
     jr $ra 
-
+    
     
 # $a0 = x <coord> for the starting point of line (+4 = +1 right)
 # $a1 = y <coord> for the starting point of line (+128 = +1 down)
