@@ -37,6 +37,9 @@ ADDR_COLORS:
 ADDR_STAGE:
     .word 0xAAAAAA   # gray (boundary)
     
+BGM:
+    .asciiz "columns-bgm.wav"
+
 ##############################################################################
 # Mutable Data
 ##############################################################################
@@ -56,6 +59,9 @@ ADDR_MARK:
 
 ADDR_LAST_KEY:
     .word -1
+
+FRAME_COUNT:
+    .word 0
 
 PAUSED:
     .word 0
@@ -84,20 +90,29 @@ main:
     
 
 game_loop:
-    # lw $t0, ADDR_KBRD               # $t0 = base address for keyboard
-    # lw $t8, 0($t0)                  # Load first word from keyboard -> input detector
-    # beq $t8, 1, keyboard_input      # If first word 1, key is pressed
+    # MILESTONE 4/5: Easy-1
+    la $t0, FRAME_COUNT
+    lw $t1, 0($t0)
+    addi $t1, $t1, 1
+    sw $t1, 0($t0)
+    li $t2, 60
+    bne $t1, $t2, sleep_one_frame
+    sw $zero, 0($t0) # initialize to 0
+    jal move_down
+sleep_one_frame:
+    la $t0, FRAME_COUNT
+    li $v0, 32
+    li $a0, 16 # 1frame/16 ms = 60 fps
+    syscall
+    
+    lw $t0, ADDR_KBRD               # $t0 = base address for keyboard
+    lw $t8, 0($t0)                  # Load first word from keyboard -> input detector
+    beq $t8, 1, keyboard_input      # If first word 1, key is pressed
     
     # BRANCH: PAUSED != 0 meaning true, do nothing.
     lw $t0, PAUSED
     bne $t0, $zero, game_loop
     # BRANCH: PAUSED == 0 meaning continue game
-
-    # MILESTONE 4/5: Easy-1
-    li $v0, 32
-    li $a0, 1000
-    syscall
-    jal move_down
 
     j game_loop
 
@@ -117,7 +132,7 @@ keyboard_input:
 
     # BRANCH: PAUSED != 0 meaning true, do nothing.
     lw $t0, PAUSED
-    bne $t0, $zero, game_loop
+    bne $t0, $zero, keyboard_input_end
     # BRANCH: PAUSED == 0 meaning continue game
 
     beq $a0, 0x71, respond_to_Q     # Check if the key q was pressed
@@ -125,7 +140,8 @@ keyboard_input:
     beq $a0, 0x64, respond_to_D     # Check if the key a was pressed
     beq $a0, 0x73, respond_to_S     # Check if the key s was pressed
     beq $a0, 0x77, respond_to_W     # Check if the key w was pressed
-    
+
+keyboard_input_end:
     j game_loop
 
 
@@ -137,6 +153,7 @@ respond_to_Q:
 # MILESTONE 4/5: Easy-6
 # handle toggle PAUSED
 respond_to_P:
+    
     la $t0, PAUSED
     # load PAUSED
     lw $t1, 0($t0)
