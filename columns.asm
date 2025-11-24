@@ -36,10 +36,6 @@ ADDR_COLORS:
 
 ADDR_STAGE:
     .word 0xAAAAAA   # gray (boundary)
-    
-BGM:
-    .asciiz "columns-bgm.wav"
-
 ##############################################################################
 # Mutable Data
 ##############################################################################
@@ -55,7 +51,7 @@ ADDR_CAPSULE_Y:
     .word 0          # y coord of capsule (bottom)
 
 ADDR_MARK:
-    .word 0:256
+    .word 0:512
 
 ADDR_LAST_KEY:
     .word -1
@@ -80,11 +76,15 @@ PAUSED:
 main:
     # Initialize the game
     lw $s0, ADDR_DSPL # load the display address
+
+    # jal display_game_over
+    # j main
     
     jal draw_stage
     jal new_capsule
     jal draw_capsule
 
+    
     # Play game
     j game_loop
     
@@ -504,7 +504,7 @@ clear_marked:
     
     la $t0, ADDR_MARK     # mark array base address
     li $t1, 0             # t1 = iterator, i & offset from base address
-    li $t2, 1024          # loop bound (0~256 = 256 * 4)
+    li $t2, 2048          # loop bound (0~256 = 256 * 4)
     clear_marked_loop:
         beq $t1, $t2, clear_done # end of loop: exit & end function
 
@@ -596,7 +596,7 @@ cd_end_loop:
         mul $t2, $s4, $t0  # dy * i
         mul $t2, $t2, -1   # should go other direction
         add $t2, $t2, $s2  # + y
-        sll $t2, $t2, 6    # * 64 to get the y offset in bits
+        sll $t2, $t2, 7    # * 128 to get the y offset in bits
 
         add $t3, $t1, $t2  # the calculated offset of address
         la $t4, ADDR_MARK  # get mark address
@@ -745,7 +745,7 @@ new_capsule:
     sw   $s1, 4($sp)
 
     # coordinate for next top
-    addi $s1, $s0, 116
+    addi $s1, $s0, 180
     
     # check if (6,3) is already painted. in case, end game.
     li $a0, 6
@@ -757,20 +757,20 @@ new_capsule:
     # upcoming color hex values 
     # (fetch from next capsule and store in ADDR_CAPSULE_COLORS)
     la   $t0, ADDR_CAPSULE_COLORS # load color address
-    lw   $t1, 128($s1) 
+    lw   $t1, 256($s1) 
     sw   $t1,   0($t0) # load color from next bot and save at current bot
-    lw   $t2,  64($s1) 
+    lw   $t2, 128($s1) 
     sw   $t2,   4($t0) # load color from next mid and save at current mid
     lw   $t3,   0($s1) 
     sw   $t3,   8($t0) # load color from next top and save at current top
     
     # generate and save random color at next capsule viewer
     jal  get_random_gem_color
-    sw   $v0,   0($s1)        # save at next top
+    sw   $v0,    0($s1)        # save at next top
     jal  get_random_gem_color
-    sw   $v0,  64($s1)        # save at next mid
+    sw   $v0,  128($s1)        # save at next mid
     jal  get_random_gem_color
-    sw   $v0, 128($s1)        # save at next bot
+    sw   $v0,  256($s1)        # save at next bot
     
     # set (x, y) of new capsule to (6, 3)
     la   $t0, ADDR_CAPSULE_X  # load x address
@@ -832,10 +832,10 @@ draw_capsule:
 # $a1 = y <coord>
 # $a2 = value to inject, is automatically painted.
 add_to_board:
-    # address = board base + 4x + 64y
+    # address = board base + 4x + 128y
     sll  $t0, $a0, 2      # t0 = 4x
-    sll  $t1, $a1, 6      # t1 = 64y
-    add  $t2, $t0, $t1    # t2 = offset = 4x + 64y
+    sll  $t1, $a1, 7      # t1 = 128y
+    add  $t2, $t0, $t1    # t2 = offset = 4x + 128y
     
     add  $t3, $s0, $t2    # final display DISPLAY = display_base + offset
     sw   $a2, 0($t3)      # paint display memory-mapped IO
@@ -847,10 +847,10 @@ add_to_board:
 # $a1 = y <coord>
 # $v0 = value returned from the board
 get_from_board:
-    # address = board base + 4x + 64y
+    # address = board base + 4x + 128y
     sll  $t0, $a0, 2      # t0 = 4x
-    sll  $t1, $a1, 6      # t1 = 64y
-    add  $t2, $t0, $t1    # t2 = offset = 4x + 64y
+    sll  $t1, $a1, 7      # t1 = 128y
+    add  $t2, $t0, $t1    # t2 = offset = 4x + 128y
 
     add  $t3, $s0, $t2    # t3 = board address of interest
     lw   $v0, 0($t3)
@@ -876,13 +876,13 @@ draw_stage:
     li $a0, 0
     li $a1, 0
     li $a2, 16
-    li $a3, 64
+    li $a3, 128
     jal draw_line # draw left stage : 0,0 to 0,15 
     
     li $a0, 11
     li $a1, 0
     li $a2, 16
-    li $a3, 64
+    li $a3, 128
     jal draw_line # draw right stage : 8,0 to 8,15 
     
     li $a0, 0
@@ -894,7 +894,7 @@ draw_stage:
     li $a0, 15
     li $a1, 0
     li $a2, 4
-    li $a3, 64
+    li $a3, 128
     jal draw_line # draw box for next block
     
     li $a0, 12
@@ -925,7 +925,7 @@ draw_p:
     li $a0, 12
     li $a1, 11
     li $a2,  5
-    li $a3, 64
+    li $a3, 128
     jal draw_line 
 
     li $a0, 12
@@ -950,16 +950,226 @@ draw_p:
     addi $sp, $sp, 4
     jr $ra 
 
+
+display_game_over:
+    addi $sp, $sp, -4
+    sw $ra, 0($sp)
+
+    li $t1, 0x00FF00      # bright green
+    
+    ############################################################
+    # ======== G (x=0, y=0) ========
+    ############################################################
+    li $a0,0
+    li $a1,0
+    li $a2,5
+    li $a3,128
+    jal draw_line     # left vertical
+    li $a0,0
+    li $a1,0
+    li $a2,3
+    li $a3,4
+    jal draw_line     # top
+    li $a0,0
+    li $a1,4
+    li $a2,3
+    li $a3,4
+    jal draw_line     # bottom
+    li $a0,2
+    li $a1,2
+    li $a2,1
+    li $a3,4
+    jal draw_line     # inside
+
+    ############################################################
+    # ======== A (x=4, y=0) ========
+    ############################################################
+    li $a0,4
+    li $a1,0
+    li $a2,3
+    li $a3,4
+    jal draw_line     # top
+    li $a0,4
+    li $a1,1
+    li $a2,4
+    li $a3,128
+    jal draw_line     # left vertical
+    li $a0,6
+    li $a1,1
+    li $a2,4
+    li $a3,128
+    jal draw_line     # right vertical
+    li $a0,4
+    li $a1,2
+    li $a2,3
+    li $a3,4
+    jal draw_line     # mid bar
+
+    ############################################################
+    # ======== M (x=8, y=0) ========
+    ############################################################
+    li $a0,8
+    li $a1,1
+    li $a2,4
+    li $a3,128
+    jal draw_line    # left vertical
+    li $a0,11
+    li $a1,1
+    li $a2,4
+    li $a3,128
+    jal draw_line    # right vertical
+    li $a0,9
+    li $a1,0
+    li $a2,1
+    li $a3,4
+    jal draw_line    # left top
+    li $a0,10
+    li $a1,0
+    li $a2,1
+    li $a3,4
+    jal draw_line    # right top
+
+    ############################################################
+    # ======== E (x=13, y=0) ========
+    ############################################################
+    li $a0,13
+    li $a1,0
+    li $a2,5
+    li $a3,128
+    jal draw_line    # vertical
+    li $a0,13
+    li $a1,0
+    li $a2,3
+    li $a3,4
+    jal draw_line    # top
+    li $a0,13
+    li $a1,2
+    li $a2,2
+    li $a3,4
+    jal draw_line    # mid
+    li $a0,13
+    li $a1,4
+    li $a2,3
+    li $a3,4
+    jal draw_line    # bottom
+
+
+    ############################################################
+    # ======== O (x=0, y=6) — moved from y=8 → y=6
+    ############################################################
+    li $a0,0
+    li $a1,6
+    li $a2,5
+    li $a3,128
+    jal draw_line     # vertical left
+    li $a0,2
+    li $a1,6
+    li $a2,5
+    li $a3,128
+    jal draw_line     # vertical right
+    li $a0,0
+    li $a1,6
+    li $a2,3
+    li $a3,4
+    jal draw_line     # top
+    li $a0,0
+    li $a1,10
+    li $a2,3
+    li $a3,4
+    jal draw_line     # bottom
+
+    ############################################################
+    # ======== V (x=4, y=6)
+    ############################################################
+    li $a0,4
+    li $a1,6
+    li $a2,4
+    li $a3,128
+    jal draw_line     # left down
+    li $a0,6
+    li $a1,6
+    li $a2,4
+    li $a3,128
+    jal draw_line     # right down
+    li $a0,5
+    li $a1,10
+    li $a2,1
+    li $a3,4
+    jal draw_line     # bottom center
+
+    ############################################################
+    # ======== E (x=8, y=6)
+    ############################################################
+    li $a0,8
+    li $a1,6
+    li $a2,5
+    li $a3,128
+    jal draw_line   # vertical
+    li $a0,8
+    li $a1,6
+    li $a2,3
+    li $a3,4
+    jal draw_line   # top
+    li $a0,8
+    li $a1,8
+    li $a2,2
+    li $a3,4
+    jal draw_line   # mid
+    li $a0,8
+    li $a1,10
+    li $a2,3
+    li $a3,4
+    jal draw_line   # bottom
+
+    ############################################################
+    # ======== R (x=13, y=6)
+    ############################################################
+    li $a0,12
+    li $a1,6
+    li $a2,5
+    li $a3,128
+    jal draw_line    # vertical
+    li $a0,13
+    li $a1,6
+    li $a2,3
+    li $a3,4
+    jal draw_line    # top
+    li $a0,13
+    li $a1,8
+    li $a2,3
+    li $a3,4
+    jal draw_line    # mid
+    li $a0,15
+    li $a1,7
+    li $a2,1
+    li $a3,4
+    jal draw_line    # right mid pixel
+    li $a0,14
+    li $a1,9
+    li $a2,1
+    li $a3,4
+    jal draw_line    # lower angled stub
+    li $a0,15
+    li $a1,10
+    li $a2,1
+    li $a3,4
+    jal draw_line    # right mid pixel
+
+
+    lw $ra, 0($sp)
+    addi $sp, $sp, 4
+    jr $ra 
+
     
 # $a0 = x <coord> for the starting point of line (+4 = +1 right)
-# $a1 = y <coord> for the starting point of line (+64 = +1 down)
+# $a1 = y <coord> for the starting point of line (+128 = +1 down)
 # $a2 = length of the line in <coord>
-# $a3 = offset (4 = horizontal, 64 = vertical)
+# $a3 = offset (4 = horizontal, 128 = vertical)
 # $s0 = the address of the top left corner
 # $t1 = gray hex code value
 draw_line:
     sll $a0, $a0, 2         # multiply the x <coord> in $a0 by 4 to get the horizontal offset
-    sll $a1, $a1, 6         # multiply the y <coord> in $a1 by 64 to get the vertical offset
+    sll $a1, $a1, 7         # multiply the y <coord> in $a1 by 128 to get the vertical offset
     add $t0, $a0, $a1       # offset added
     add $t0, $s0, $t0       # add offset to the display address
     
