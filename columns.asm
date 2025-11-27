@@ -39,16 +39,16 @@ ADDR_STAGE:
 ##############################################################################
 # Mutable Data
 ##############################################################################
-ADDR_CAPSULE_COLORS:
+ADDR_BLOCK_COLORS:
     .word 0          # bot gem color
     .word 0          # mid gem color
     .word 0          # top gem color
     
-ADDR_CAPSULE_X:
-    .word 0          # x coord of capsule
+ADDR_BLOCK_X:
+    .word 0          # x coord of block
     
-ADDR_CAPSULE_Y:
-    .word 0          # y coord of capsule (bottom)
+ADDR_BLOCK_Y:
+    .word 0          # y coord of block (bottom)
 
 ADDR_MARK:
     .word 0:512
@@ -91,8 +91,8 @@ main:
     # j main
     
     jal draw_stage
-    jal new_capsule
-    jal draw_capsule
+    jal new_block
+    jal draw_block
 
     la $t0, SCORE
     sw $zero, 0($t0)
@@ -105,7 +105,8 @@ main:
     
 
 game_loop:
-    # MILESTONE 4/5: Easy-1
+    # MILESTONE: Easy-1 (implement gravity)
+    # counts up to SPEED (initially 60) and reaching that, move block down
     la $t0, FRAME_COUNT
     lw $t1, 0($t0)
     addi $t1, $t1, 1
@@ -236,8 +237,8 @@ respond_to_A:
     sw   $s1, 4($sp)
     sw   $s2, 8($sp)
 
-    lw   $s1, ADDR_CAPSULE_X       # x column
-    lw   $s2, ADDR_CAPSULE_Y       # y row bottom
+    lw   $s1, ADDR_BLOCK_X       # x column
+    lw   $s2, ADDR_BLOCK_Y       # y row bottom
 
     # collision detection
 
@@ -262,7 +263,7 @@ respond_to_A:
     # BRANCH: cannot move => halt movement
     bne $zero, $zero, end_respond_to_D
     
-    # BRANCH: can move => erase current capsule -> update location -> draw new capsule
+    # BRANCH: can move => erase current block -> update location -> draw new block
     # 1) erase the current gem
     # 1-1) bottom gem
     move $a0, $s1        # x
@@ -281,13 +282,13 @@ respond_to_A:
     jal add_to_board
     
     # 2) next, update the gem location (y does not change)
-    la   $t0, ADDR_CAPSULE_X    # load x address
+    la   $t0, ADDR_BLOCK_X    # load x address
     lw   $t1, 0($t0)  # x coord
     addi $t1, $t1, -1  # x = x - 1
     sw   $t1, 0($t0)  # update new x value (x = x - 1)
     
-    # 3) draw capsule once again
-    jal draw_capsule
+    # 3) draw block once again
+    jal draw_block
 end_respond_to_A:
     lw   $ra, 0($sp)
     lw   $s1, 4($sp)
@@ -303,8 +304,8 @@ respond_to_D:
     sw   $s1, 4($sp)
     sw   $s2, 8($sp)
 
-    lw   $s1, ADDR_CAPSULE_X       # x column
-    lw   $s2, ADDR_CAPSULE_Y       # y row bottom
+    lw   $s1, ADDR_BLOCK_X       # x column
+    lw   $s2, ADDR_BLOCK_Y       # y row bottom
 
     # collision detection
 
@@ -330,7 +331,7 @@ respond_to_D:
     # BRANCH: cannot move => halt movement
     bne $zero, $zero, end_respond_to_D
     
-    # BRANCH: can move => erase current capsule -> update location -> draw new capsule
+    # BRANCH: can move => erase current block -> update location -> draw new block
     # 1) erase the current gem
     # 1-1) bottom gem
     move $a0, $s1        # x
@@ -349,13 +350,13 @@ respond_to_D:
     jal add_to_board
     
     # 2) next, update the gem location (y does not change)
-    la   $t0, ADDR_CAPSULE_X    # load x address
+    la   $t0, ADDR_BLOCK_X    # load x address
     lw   $t1, 0($t0)  # x coord
     addi $t1, $t1, 1  # x = x + 1
     sw   $t1, 0($t0)  # update new x value (x = x + 1)
     
-    # 3) draw capsule once again
-    jal draw_capsule
+    # 3) draw block once again
+    jal draw_block
 end_respond_to_D:
     lw   $ra, 0($sp)
     lw   $s1, 4($sp)
@@ -373,8 +374,8 @@ move_down:
     sw   $s2,  8($sp) # y location
     sw   $s3, 12($sp) # loop variable
 
-    lw   $s1, ADDR_CAPSULE_X
-    lw   $s2, ADDR_CAPSULE_Y
+    lw   $s1, ADDR_BLOCK_X
+    lw   $s2, ADDR_BLOCK_Y
 
     # first, erase the current gem
     # 1) bottom gem
@@ -396,16 +397,16 @@ move_down:
     jal add_to_board
 
     # next, update the gem location (x does not change)
-    la   $t0, ADDR_CAPSULE_Y    # load y address
+    la   $t0, ADDR_BLOCK_Y    # load y address
     addi $t1, $s2, 1            # ny = y + 1
     sw   $t1, 0($t0)            # update new y value (y = y + 1)
     
-    lw   $s2, ADDR_CAPSULE_Y    # update new y value
+    lw   $s2, ADDR_BLOCK_Y    # update new y value
 
-    # draw capsule once again
-    jal draw_capsule
+    # draw block once again
+    jal draw_block
 
-    # capsule location updated (1 down), now check for collision.
+    # block location updated (1 down), now check for collision.
 
     # get bottom = color(x, y + 1)
     move $a0, $s1
@@ -436,9 +437,9 @@ move_down:
         addi $s3, $s3, 1
         j check_game_over_loop
     check_game_over_end_loop:
-        # create new capsule
-        jal new_capsule
-        jal draw_capsule
+        # create new block
+        jal new_block
+        jal draw_block
 end_respond_to_S:
     lw   $ra,  0($sp)
     lw   $s1,  4($sp)
@@ -773,7 +774,7 @@ respond_to_W:
     addi $sp, $sp, -4
     sw   $ra, 0($sp)
     
-    la $t0, ADDR_CAPSULE_COLORS # capsule address
+    la $t0, ADDR_BLOCK_COLORS # block address
     lw $t1, 0($t0)              # bot gem color
     lw $t2, 4($t0)              # mid gem color
     lw $t3, 8($t0)              # top gem color
@@ -782,7 +783,7 @@ respond_to_W:
     sw $t2, 0($t0)              # store mid gem color into bot
     sw $t1, 8($t0)              # store bot gem color into top
     
-    jal draw_capsule            # update the gem colors
+    jal draw_block            # update the gem colors
 
     # END respond_to_w
     lw   $ra, 0($sp)
@@ -797,9 +798,9 @@ respond_to_E:
     sw   $s2, 8($sp)
     sw   $s3, 12($sp)
 
-    lw $s1, ADDR_CAPSULE_X
-    lw $s2, ADDR_CAPSULE_Y
-    la $s3, ADDR_CAPSULE_COLORS
+    lw $s1, ADDR_BLOCK_X
+    lw $s2, ADDR_BLOCK_Y
+    la $s3, ADDR_BLOCK_COLORS
 
     # erase the block at current location (x, y)
     li $t1, 0 # set color to black
@@ -810,7 +811,7 @@ respond_to_E:
     li $a3, 128         # vertical offset
     jal draw_line
 
-    # if there is no saved, save the current capsule and do new_capsule
+    # if there is no saved, save the current block and do new_block
     # 1) get saved bottom gem color
     li $a0, 13 # x of saved
     li $a1, 14 # y of saved
@@ -852,22 +853,22 @@ respond_to_E:
     move   $a2, $t1   # bottom gem color
     jal add_to_board
 
-    # if the swapped color is black - do new_capsule
+    # if the swapped color is black - do new_block
     lw $t0, 0($s3)
-    bne $t0, $zero, reset_capsule_location
-    jal new_capsule
+    bne $t0, $zero, reset_block_location
+    jal new_block
     
-reset_capsule_location:
-    # reset the capsule location to (6, 3)
-    la $t0, ADDR_CAPSULE_X
+reset_block_location:
+    # reset the block location to (6, 3)
+    la $t0, ADDR_BLOCK_X
     li $t1, 6
     sw $t1, 0($t0)
-    la $t0, ADDR_CAPSULE_Y
+    la $t0, ADDR_BLOCK_Y
     li $t1, 3
     sw $t1, 0($t0)
 
-    # do draw capsule
-    jal draw_capsule
+    # do draw block
+    jal draw_block
 
     lw $ra, 0($sp)
     lw $s1, 4($sp)
@@ -891,9 +892,9 @@ get_random_gem_color:
     jr  $ra              # return to original line
     
     
-# create a new capsule, initialized at 6,3
+# create a new block, initialized at 6,3
 # if there is a gem at 6,3 (and above), end game
-new_capsule:
+new_block:
     addi $sp, $sp, -8
     sw   $ra, 0($sp)
     sw   $s1, 4($sp)
@@ -909,8 +910,8 @@ new_capsule:
     
     # MILESTONE 4/5: Easy-10
     # upcoming color hex values 
-    # (fetch from next capsule and store in ADDR_CAPSULE_COLORS)
-    la   $t0, ADDR_CAPSULE_COLORS # load color address
+    # (fetch from next block and store in ADDR_BLOCK_COLORS)
+    la   $t0, ADDR_BLOCK_COLORS # load color address
     lw   $t1, 256($s1) 
     sw   $t1,   0($t0) # load color from next bot and save at current bot
     lw   $t2, 128($s1) 
@@ -918,7 +919,7 @@ new_capsule:
     lw   $t3,   0($s1) 
     sw   $t3,   8($t0) # load color from next top and save at current top
     
-    # generate and save random color at next capsule viewer
+    # generate and save random color at next block viewer
     jal  get_random_gem_color
     sw   $v0,    0($s1)        # save at next top
     jal  get_random_gem_color
@@ -926,35 +927,35 @@ new_capsule:
     jal  get_random_gem_color
     sw   $v0,  256($s1)        # save at next bot
     
-    # set (x, y) of new capsule to (6, 3)
-    la   $t0, ADDR_CAPSULE_X  # load x address
+    # set (x, y) of new block to (6, 3)
+    la   $t0, ADDR_BLOCK_X  # load x address
     li   $t1, 6               # put in 6 (starting x coord)
-    sw   $t1, 0($t0)          # save to ADDR_CAPSULE_X
-    la   $t2, ADDR_CAPSULE_Y  # load y address
+    sw   $t1, 0($t0)          # save to ADDR_BLOCK_X
+    la   $t2, ADDR_BLOCK_Y  # load y address
     li   $t3, 3               # put in 3 (starting y coord)
-    sw   $t3, 0($t2)          # save to ADDR_CAPSULE_Y
+    sw   $t3, 0($t2)          # save to ADDR_BLOCK_Y
     
     lw   $ra, 0($sp)
     lw   $s1, 4($sp)
     addi $sp, $sp, 8
     
-    lw   $t0, ADDR_CAPSULE_COLORS   # load first color in capsule (bot)
-    beq  $t0, $zero, new_capsule    # if black, needs another round of this
+    lw   $t0, ADDR_BLOCK_COLORS   # load first color in block (bot)
+    beq  $t0, $zero, new_block    # if black, needs another round of this
     
     jr   $ra
   
 
-# draw current capsule. 
-draw_capsule:
+# draw current block. 
+draw_block:
     addi $sp, $sp, -16
     sw   $ra,  0($sp)
     sw   $s1,  4($sp)
     sw   $s2,  8($sp)
     sw   $s3, 12($sp)
 
-    lw   $s1, ADDR_CAPSULE_X       # x column
-    lw   $s2, ADDR_CAPSULE_Y       # bottom y
-    la   $s3, ADDR_CAPSULE_COLORS  # colors
+    lw   $s1, ADDR_BLOCK_X       # x column
+    lw   $s2, ADDR_BLOCK_Y       # bottom y
+    la   $s3, ADDR_BLOCK_COLORS  # colors
 
     # 1) bottom gem
     move $a0, $s1      # x
