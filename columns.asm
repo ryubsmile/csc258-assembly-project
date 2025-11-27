@@ -109,11 +109,7 @@ game_loop:
     la $t0, FRAME_COUNT
     lw $t1, 0($t0)
     addi $t1, $t1, 1
-    sw $t1, 0($t0)
-    lw $t2, SPEED
-    bne $t1, $t2, sleep_one_frame
-    sw $zero, 0($t0) # initialize to 0
-    jal move_down
+    
 sleep_one_frame:
     la $t0, FRAME_COUNT
     li $v0, 32
@@ -128,7 +124,12 @@ sleep_one_frame:
     lw $t0, PAUSED
     bne $t0, $zero, game_loop
     # BRANCH: PAUSED == 0 meaning continue game
-
+    la $t0, FRAME_COUNT
+    sw $t1, 0($t0)
+    lw $t2, SPEED
+    bne $t1, $t2, game_loop
+    sw $zero, 0($t0) # initialize to 0
+    jal move_down
     j game_loop
 
 
@@ -1106,27 +1107,27 @@ hide_pause:
     li $t1, 0
 draw_p:
     li $a0, 12
-    li $a1, 11
+    li $a1, 6
     li $a2,  5
     li $a3, 128
     jal draw_line 
 
     li $a0, 12
-    li $a1, 11
+    li $a1, 5
     li $a2,  3
     li $a3,  4
     jal draw_line
 
     li $a0, 12
-    li $a1, 13
+    li $a1, 8
     li $a2,  3
     li $a3,  4
     jal draw_line
 
     li $a0, 15
-    li $a1, 12
-    li $a2,  1
-    li $a3,  4
+    li $a1, 6
+    li $a2,  2
+    li $a3,  128
     jal draw_line
     
     lw $ra, 0($sp)
