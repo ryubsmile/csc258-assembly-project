@@ -135,6 +135,7 @@ sleep_one_frame:
 
 
 game_over:
+    # MILESTONE: Easy-4 (display game over, add retry feature)
     jal paint_black
     jal display_game_over
     li $v0, 32
@@ -142,6 +143,7 @@ game_over:
     syscall
     jal cascade
     
+    # MILESTONE: Easy-9 (update highest score, maintain after restart)
     lw $t0, HIGHEST_SCORE
     lw $t1, SCORE
     bge $t0, $t1, game_over_loop
@@ -208,7 +210,7 @@ respond_to_Q:
 # MILESTONE 4/5: Easy-6
 # handle toggle PAUSED
 respond_to_P:
-    
+    # MILESTONE: Easy-6 (implement pause feature)
     la $t0, PAUSED
     # load PAUSED
     lw $t1, 0($t0)
@@ -588,6 +590,7 @@ clear_done:
     ble $s1, 20, clear_clean_up
     la $t1, SPEED
     li $t2, 40
+    # MILESTONE: Easy-2 (speed up gravity at user achieving certain level)
     sw $t2, 0($t1) # update speed to 40 after score is 20
 
 clear_clean_up:
@@ -792,6 +795,7 @@ respond_to_W:
     
 
 respond_to_E:
+    # MILESTONE: Easy-12 (implement save feature)
     addi $sp, $sp, -16
     sw   $ra, 0($sp)
     sw   $s1, 4($sp)
@@ -908,7 +912,7 @@ new_block:
     jal get_from_board
     bne $v0, $zero, game_over
     
-    # MILESTONE 4/5: Easy-10
+    # MILESTONE: Easy-10 (show next block)
     # upcoming color hex values 
     # (fetch from next block and store in ADDR_BLOCK_COLORS)
     la   $t0, ADDR_BLOCK_COLORS # load color address
@@ -1198,6 +1202,8 @@ draw_highest_score:
 
 # draw_score function: Displays the current score (0-999) in the bottom-left corner.
 draw_score:
+    # MILESTONE: HARD-1 (implement scoreboard in pixels)
+
     # Save necessary registers on the stack
     addi $sp, $sp, -16
     sw $ra, 0($sp)  # Save $ra
