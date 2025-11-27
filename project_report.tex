@@ -1,0 +1,297 @@
+\documentclass{article}
+
+%% Page Margins %%
+\usepackage{geometry}
+\geometry{
+    top = 0.75in,
+    bottom = 0.75in,
+    right = 0.75in,
+    left = 0.75in,
+}
+
+\usepackage{amsmath}
+\usepackage{graphicx}
+\usepackage{parskip}
+
+\title{Assembly Project: Columns}
+
+\author{(Jeff) Jaehyuk Ryu}
+
+\begin{document}
+\maketitle
+
+\section{Instruction and Summary}
+
+\begin{enumerate}
+
+    \item Which milestones were implemented? 
+    
+    Milestone 1 to 5 (Complete).
+
+    \item How to view the game:
+    
+    \begin{enumerate}
+
+    \item unit weight in pixels: 4, for both x and y.
+    \item width: 32 pixels
+    \item height: 16 pixels
+    \item stage size: 12 * 16
+    \item upper middle gray box: next column
+    \item lower middle gray box: save column
+    
+    \end{enumerate}
+
+    \begin{figure}[ht!]
+        \centering
+        \includegraphics[width=0.5\linewidth]{image.png}
+        \caption{Instructions}
+        \label{fig:placeholder}
+    \end{figure}
+
+\item Game Summary:
+\begin{itemize}
+    \item a typical columns game, with few additional features.
+    \item game ends if height reaches the top 2 rows, or Q pressed.
+    \item a, d to move the block horizontally, s to move the block downward. 
+    \item w shifts the orientation of the block.
+    \item e to save the block for now.
+    \item p pauses the game until p is pressed for the second time.
+    \item at every 'landing', checks for collisions.
+    \item additional features are implemented, see below.
+\end{itemize}
+
+    
+\end{enumerate}
+
+\section{Attribution Table}
+
+\begin{center}
+\begin{tabular}{|| c ||}
+\hline
+ Jaehyuk Ryu (1009558079)  \\ 
+ \hline
+ Pre-build set-up \\
+ \hline
+ Stage set-up \\
+ \hline
+ Painting structure set-up \\
+ \hline
+ Keystroke set-up \\
+ \hline
+ Collision detection set-up \\
+ \hline
+ Game over detection set-up \\
+ \hline
+ MILESTONE 4, 5 set-up \\
+ \hline
+\end{tabular}
+\end{center}
+
+\section{MileStones}
+
+\begin{enumerate}
+\item Milestone 1, stage set up. 
+\begin{itemize}
+    \item Drew lines in 12*16 boundary, as a game stage. 
+\begin{figure}[ht!]
+    \centering
+    \includegraphics[width=0.5\linewidth]{milestone-1.jpeg}
+    \caption{Milestone 1 bitmap snapshot}
+    \label{fig:placeholder}
+\end{figure}
+    \item Top-right corner is preserved for displaying the next block.
+    \item new block starts at (6,3) always, with bottom gem being the standard for its location. If a gem is already filled up in the three spaces when a new block is created, it counts as a game over.
+    \newpage
+    \begin{figure}[ht!]
+        \centering
+        \begin{minipage}{0.48\textwidth}
+            \centering
+            \includegraphics[width=\linewidth]{m1-02.png}
+            \caption{Getter function}
+        \end{minipage}
+        \hfill
+        \begin{minipage}{0.48\textwidth}
+            \centering
+            \includegraphics[width=\linewidth]{m1-01.png}
+            \caption{Setter function. Stores + Paints}
+        \end{minipage}
+    \end{figure}
+    \item Created a getter and setter for the board, calculating the offset inside the functions.
+\end{itemize}
+
+
+\item Milestone 2, movements and keystrokes set up.
+
+\begin{itemize}
+    \item A, D for left and right movements
+    \item S for downward maneuver
+    \item W for shuffling the orientation
+    \item Q for quitting the game, manually (gracefully!)
+    \begin{figure}[ht!]
+        \begin{minipage}{0.48\textwidth}
+            \centering
+            \includegraphics[width=\linewidth]{Image 11-20-25 at 15.42.jpeg}
+            \caption{Milestone 2 bitmap snapshot}
+            \label{fig:placeholder}
+        \end{minipage}
+        \begin{minipage}{0.48\textwidth}
+            \centering
+            \includegraphics[width=\linewidth]{m2-01.png}
+            \caption{Keyboard Input Mapper}
+            \label{fig:placeholder}
+        \end{minipage}
+    \end{figure}
+\end{itemize}
+
+\newpage
+\item Milestone 3, Collision detection.
+
+\begin{itemize}
+    \item When moving left and right, prevent moving if there is a block to the place the block would go if it were empty.
+        
+    \begin{figure}[ht!]
+        \begin{minipage}{0.48\textwidth}
+            \centering
+            \includegraphics[width=\linewidth]{m3-01.png}
+            \caption{Checker code for the possible future location \\when D is pressed.}
+            \label{fig:placeholder}
+        \end{minipage}
+        \begin{minipage}{0.48\textwidth}
+            \centering
+            \includegraphics[width=\linewidth]{m3-02.png}
+            \caption{Code for cleaning up prev spot, \\setting up new block, drawing it.}
+            \label{fig:placeholder}
+        \end{minipage}
+    \end{figure}
+
+    \item When moving downwards, if it hits a block that is not empty (that is, either the stage–rock bottom or another gem that was placed before), check for matches in a loop until there is no match.
+    \begin{figure}[ht!]
+        \centering
+        \includegraphics[width=0.5\linewidth]{m3-03.png}
+        \caption{Basic code structure for collision detection}
+        \label{fig:placeholder}
+    \end{figure}
+    \item Here, an array (4*16*16=1024bits) is used to mark the locations of matches. After the entire scan, another iteration through the mark array starts off. The offset from mark base to match cell would be the same as the one from base address of display to the actual cell to erase. This idea was used to find the exact location of display to erase.
+\end{itemize}
+\vspace{30pt}
+\item Milestone 4 + 5: implemented 1 HARD, 7 EASY features.
+
+\end{enumerate}
+
+\begin{itemize}
+    \item 1st HARD feature: Hard(1), display scoreboard.
+    \begin{figure}[ht!]
+        \begin{minipage}{0.48\textwidth}
+            \centering
+            \includegraphics[width=\linewidth]{h1.png}
+            \caption{Code that calculates each digit by doing modulo operation and draws the digit accordingly.}
+            \label{fig:placeholder}
+        \end{minipage}
+        \begin{minipage}{0.48\textwidth}
+            \centering
+            \includegraphics[width=\linewidth]{h1-1.png}
+            \caption{How it looks on the display.}
+            \label{fig:placeholder}
+        \end{minipage}
+    \end{figure}
+    \item 1st EASY feature: Easy(1), add gravity.
+    \begin{figure}[ht!]
+        \centering
+        \includegraphics[width=0.5\linewidth]{e1-1.png}
+        \caption{Code that makes FRAMES by making a loop that sleeps for 1/60 second and moves one block down by 60 frames.}
+        \label{fig:placeholder}
+    \end{figure}
+    \item 2nd EASY feature: Easy(2), make gravity faster as score reaches certain level.
+    \begin{figure}[ht!]
+        \centering
+        \includegraphics[width=0.5\linewidth]{e2-1.png}
+        \caption{Code that executes after removing (scoring columns), and checks if score went over 20 to set SPEED 40 (the frame needed to automatically drag 1 tick down).}
+        \label{fig:placeholder}
+    \end{figure}
+    
+    \item 3rd EASY feature: Easy(4), display gameover state and add retry feature.
+    
+    \begin{figure}[ht!]
+        \begin{minipage}{0.48\textwidth}
+            \centering
+            \includegraphics[width=\linewidth]{e4-1.png}
+            \caption{Game over screen that is displayed at game over. RETRY text flickers every 400ms. At pressing any button, game resets. (Pixels at bottom left are intended.)}
+            \label{fig:placeholder}
+        \end{minipage}
+        \begin{minipage}{0.48\textwidth}
+            \centering
+            \includegraphics[width=\linewidth]{e4-2.png}
+            \caption{How it looks on the display.}
+            \label{fig:placeholder}
+        \end{minipage}
+    \end{figure}
+    
+    \item 4th EASY feature: Easy(6), add pause feature when pressing p.
+    
+    \begin{figure}[ht!]
+        \begin{minipage}{0.48\textwidth}
+            \centering
+            \includegraphics[width=\linewidth]{e6-1.png}
+            \caption{Paused screen. The block does not fall automatically, and any game interaction is ignored, excluding the resume key p.}
+            \label{fig:placeholder}
+        \end{minipage}
+        \begin{minipage}{0.48\textwidth}
+            \centering
+            \includegraphics[width=\linewidth]{e6-2.png}
+            \caption{The code that toggles state word PAUSED. Toggle boolean logic is $\text{state} \times -1 + 1$.}
+            \label{fig:placeholder}
+        \end{minipage}
+    \end{figure}
+    \item 5th EASY feature: Easy(9), display highest score.
+    
+    \begin{figure}[ht!]
+        \begin{minipage}{0.48\textwidth}
+            \centering
+            \includegraphics[width=\linewidth]{e9-1.png}
+            \caption{The updated highest scoreboard (in RED). After every retry, the score is updated.}
+            \label{fig:placeholder}
+        \end{minipage}
+        \begin{minipage}{0.48\textwidth}
+            \centering
+            \includegraphics[width=\linewidth]{e9-2.png}
+            \caption{Code that updates scoreboard. Executed on gameover.}
+            \label{fig:placeholder}
+        \end{minipage}
+    \end{figure}
+    \item 6th EASY feature: Easy(10), show next block
+    \begin{figure}[ht!]
+        \begin{minipage}{0.48\textwidth}
+            \centering
+            \includegraphics[width=\linewidth]{h1-1.png}
+            \caption{Upper middle gray box is where the next column block will appear.}
+            \label{fig:placeholder}
+        \end{minipage}
+        \begin{minipage}{0.48\textwidth}
+            \centering
+            \includegraphics[width=\linewidth]{e-10-1.png}
+            \caption{The code that fetches color from the next block cell. }
+            \label{fig:placeholder}
+        \end{minipage}
+    \end{figure}
+    \newpage
+    \item 7th EASY feature: Easy(12), implement save
+    \begin{figure}[ht!]
+        \begin{minipage}{0.48\textwidth}
+            \centering
+            \includegraphics[width=\linewidth]{e12-1.png}
+            \caption{Code swaps the columns in the SAVE (middle bottom gray box) with the column that is active.}
+            \label{fig:placeholder}
+        \end{minipage}
+        \begin{minipage}{0.48\textwidth}
+            \centering
+            \includegraphics[width=\linewidth]{e12-2.png}
+            \caption{How it looks on the display.}
+            \label{fig:placeholder}
+        \end{minipage}
+    \end{figure}
+\end{itemize}
+
+
+
+
+\end{document}
