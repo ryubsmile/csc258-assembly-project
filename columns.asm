@@ -62,6 +62,9 @@ FRAME_COUNT:
 PAUSED:
     .word 0
 
+SPEED:
+    .word 60 # frame needed to auto-drop 1 tick
+
 SCORE:
     .word 000
 
@@ -99,7 +102,7 @@ game_loop:
     lw $t1, 0($t0)
     addi $t1, $t1, 1
     sw $t1, 0($t0)
-    li $t2, 60
+    lw $t2, SPEED
     bne $t1, $t2, sleep_one_frame
     sw $zero, 0($t0) # initialize to 0
     jal move_down
@@ -561,10 +564,16 @@ clear_marked:
         addi $t1, $t1, 4  # i+=4
         j clear_marked_loop
 clear_done:
+    # update scores
     la $t0, SCORE
     sw $s1, 0($t0)
     jal draw_score
+    ble $s1, 20, clear_clean_up
+    la $t1, SPEED
+    li $t2, 40
+    sw $t2, 0($t1) # update speed to 40 after score is 20
 
+clear_clean_up:
     lw $ra, 0($sp)
     lw $s1, 4($sp)
     addi $sp, $sp, 8
