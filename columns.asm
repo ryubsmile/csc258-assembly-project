@@ -62,6 +62,9 @@ FRAME_COUNT:
 PAUSED:
     .word 0
 
+SCORE:
+    .word 000
+
 ##############################################################################
 # Mutable Data
 ##############################################################################
@@ -84,6 +87,7 @@ main:
     jal draw_stage
     jal new_capsule
     jal draw_capsule
+    jal draw_score
 
     # Play game
     j game_loop
@@ -530,8 +534,11 @@ find_match_end_loop:
             
 
 clear_marked:
-    addi $sp, $sp, -4
+    addi $sp, $sp, -8
     sw   $ra, 0($sp)
+    sw   $s1, 4($sp)
+
+    lw $s1, SCORE # load score
     
     la $t0, ADDR_MARK     # mark array base address
     li $t1, 0             # t1 = iterator, i & offset from base address
@@ -546,6 +553,7 @@ clear_marked:
         beq $t4, $zero, clear_mark_continue 
         
         # BRANCH: mark(x, y) != 0 => has mark, erase mark + erase gem @ (x, y)
+        addi $s1, $s1, 1  # increment score by 1
         sw $zero, 0($t3)  # erase mark
         add $t5, $s0, $t1 # display address of interest
         sw $zero, 0($t5)  # paint black
@@ -553,8 +561,13 @@ clear_marked:
         addi $t1, $t1, 4  # i+=4
         j clear_marked_loop
 clear_done:
-    lw $ra 0($sp)
-    addi $sp, $sp, 4
+    la $t0, SCORE
+    sw $s1, 0($t0)
+    jal draw_score
+
+    lw $ra, 0($sp)
+    lw $s1, 4($sp)
+    addi $sp, $sp, 8
     jr $ra
 
     
@@ -1000,6 +1013,467 @@ draw_p:
     jr $ra 
 
 
+# draw_score function: Displays the current score (0-999) in the bottom-left corner.
+draw_score:
+    # Save necessary registers on the stack
+    addi $sp, $sp, -16
+    sw $ra, 0($sp)  # Save $ra
+    sw $s1, 4($sp)   # Save $s1 (color)
+    sw $s2, 8($sp)   # Save $s2 (start X coordinate)
+    sw $s3, 12($sp)  # Save $s3 (score)
+
+    lw $s3, SCORE
+    la $t1, 0x00FF00    # **Set $t1 with the color**, as required by draw_line.
+
+    # Set Scoreboard starting position (Bottom-Left)
+    li $t6, 8       # $t6 = start_y (Y coordinate is fixed for 3x5 digits: 16 - 5 = 11)
+    li $s2, 20        # $s2 = current_x (Start X coordinate)
+
+    # 1. Calculate and Draw the HUNDREDS Digit
+    li $t0, 100      
+    div $t2, $s3, $t0 # $t2 = Hundreds digit 
+    mul $t3, $t2, $t0 
+    sub $s3, $s3, $t3 # $s3 = Remaining score (0-99)
+
+    # Call draw_digit (Hundreds place)
+    move $a0, $t2    # $a0 = digit (0-9)
+    move $a1, $s2    # $a1 = x_start
+    move $a2, $t6    # $a2 = y_start
+    jal draw_digit
+    addi $s2, $s2, 4 # Update X coordinate: 3 (width) + 1 (spacing) = 4
+
+    # 2. Calculate and Draw the TENS Digit
+    li $t0, 10       
+    div $t2, $s3, $t0 # $t2 = Tens digit
+    mul $t3, $t2, $t0 
+    sub $s3, $s3, $t3 # $s3 = Remaining score (0-9)
+
+    # Call draw_digit (Tens place)
+    move $a0, $t2    
+    move $a1, $s2    
+    move $a2, $t6    
+    jal draw_digit
+    addi $s2, $s2, 4 # Update X coordinate
+
+    # 3. Draw the ones digit
+    move $t2, $s3    # $t2 = Ones digit
+
+    # Call draw_digit (Ones place)
+    move $a0, $t2    
+    move $a1, $s2    
+    move $a2, $t6    
+    jal draw_digit
+
+    # Restore registers and return
+    lw $ra, 0($sp)
+    lw $s1, 4($sp)
+    lw $s2, 8($sp)
+    lw $s3, 12($sp)
+    addi $sp, $sp, 16
+    jr $ra
+
+
+# Draws a single 3x5 digit number
+# $a0: digit (0-9)
+# $a1: x_start (starting X coordinate of the 3x5 block)
+# $a2: y_start (starting Y coordinate of the 3x5 block)
+# $t1: color code
+# Register Usage:
+#   $s1: x_start (base X)
+#   $s2: y_start (base Y)
+#   $t1: color (set by draw_score)
+#   $a0-$a3: used as arguments for draw_line
+# ----------------------------------------------------------------------
+draw_digit:
+    # Save used registers ($s3, $t4)
+    addi $sp, $sp, -20
+    sw $ra, 0($sp)
+    sw $s1, 4($sp) 
+    sw $s2, 8($sp) 
+    sw $s3, 12($sp)
+    sw $t1, 16($sp)
+
+    move $s1, $a1  # $s1 = x_start (base X)
+    move $s2, $a2  # $s2 = y_start (base Y)
+    move $s3, $a0  # save a0 while erasing
+    
+    li $t1, 0
+    addi $a0, $s1, 0  # x = x_start + 0
+    addi $a1, $s2, 0  # y = y_start + 0
+    li $a2, 5         # length = 5
+    li $a3, 128         # horizontal offset
+    jal draw_line
+    addi $a0, $s1, 1  # x = x_start + 0
+    addi $a1, $s2, 0  # y = y_start + 0
+    li $a2, 5         # length = 5
+    li $a3, 128         # horizontal offset
+    jal draw_line
+    addi $a0, $s1, 2  # x = x_start + 0
+    addi $a1, $s2, 0  # y = y_start + 0
+    li $a2, 5         # length = 5
+    li $a3, 128         # horizontal offset
+    jal draw_line
+    
+    move $a0, $s3   # load a0
+    lw $t1, 16($sp) # load color
+    # Branch based on the digit value
+    beq $a0, 0, draw_0
+    beq $a0, 1, draw_1
+    beq $a0, 2, draw_2
+    beq $a0, 3, draw_3
+    beq $a0, 4, draw_4
+    beq $a0, 5, draw_5
+    beq $a0, 6, draw_6
+    beq $a0, 7, draw_7
+    beq $a0, 8, draw_8
+    beq $a0, 9, draw_9
+    
+    j draw_digit_end # Should not be reached if $a0 is 0-9
+
+# --- Draw 0 Logic (3x5) ---
+draw_0:
+    # 0: Top, Bottom, Left (5), Right (5)
+    
+    # 1. Top bar (x0, y0, len 3, H)
+    addi $a0, $s1, 0  # x = x_start + 0
+    addi $a1, $s2, 0  # y = y_start + 0
+    li $a2, 3         # length = 3
+    li $a3, 4         # horizontal offset
+    jal draw_line
+    
+    # 2. Bottom bar (x0, y4, len 3, H)
+    addi $a0, $s1, 0  # x = x_start + 0
+    addi $a1, $s2, 4  # y = y_start + 4
+    li $a2, 3         # length = 3
+    li $a3, 4         # horizontal offset
+    jal draw_line
+    
+    # 3. Left bar (x0, y0, len 5, V)
+    addi $a0, $s1, 0  # x = x_start + 0
+    addi $a1, $s2, 0  # y = y_start + 0
+    li $a2, 5         # length = 5
+    li $a3, 128       # vertical offset
+    jal draw_line
+    
+    # 4. Right bar (x2, y0, len 5, V)
+    addi $a0, $s1, 2  # x = x_start + 2
+    addi $a1, $s2, 0  # y = y_start + 0
+    li $a2, 5         # length = 5
+    li $a3, 128       # vertical offset
+    jal draw_line
+    
+    j draw_digit_end
+
+# --- Draw 1 Logic (3x5) ---
+draw_1:
+    # 1: Simple Right/Center vertical bar
+    
+    # 1. Center Vertical bar (x2, y0, len 5, V - using rightmost pixel for visibility)
+    addi $a0, $s1, 2  # x = x_start + 2 
+    addi $a1, $s2, 0  # y = y_start + 0
+    li $a2, 5         # length = 5
+    li $a3, 128       # vertical offset
+    jal draw_line
+    
+    j draw_digit_end
+
+# --- Draw 2 Logic (3x5) ---
+draw_2:
+    # 2: Top, Right(Top), Mid, Left(Bottom), Bottom
+    
+    # 1. Top bar (x0, y0, len 3, H)
+    addi $a0, $s1, 0 
+    addi $a1, $s2, 0 
+    li $a2, 3 
+    li $a3, 4 
+    jal draw_line
+    
+    # 2. Right side (Top Half) (x2, y0, len 3, V)
+    addi $a0, $s1, 2 
+    addi $a1, $s2, 0 
+    li $a2, 3 
+    li $a3, 128 
+    jal draw_line
+    
+    # 3. Middle bar (x0, y2, len 3, H)
+    addi $a0, $s1, 0 
+    addi $a1, $s2, 2 
+    li $a2, 3 
+    li $a3, 4 
+    jal draw_line
+    
+    # 4. Left side (Bottom Half) (x0, y2, len 3, V)
+    addi $a0, $s1, 0 
+    addi $a1, $s2, 2 
+    li $a2, 3 
+    li $a3, 128 
+    jal draw_line
+    
+    # 5. Bottom bar (x0, y4, len 3, H)
+    addi $a0, $s1, 0 
+    addi $a1, $s2, 4 
+    li $a2, 3 
+    li $a3, 4 
+    jal draw_line
+    
+    j draw_digit_end
+
+# --- Draw 3 Logic (3x5) ---
+draw_3:
+    # 3: Top, Mid, Bottom, Right (5)
+    
+    # 1. Top bar (x0, y0, len 3, H)
+    addi $a0, $s1, 0 
+    addi $a1, $s2, 0 
+    li $a2, 3 
+    li $a3, 4 
+    jal draw_line
+    
+    # 2. Middle bar (x0, y2, len 3, H)
+    addi $a0, $s1, 0 
+    addi $a1, $s2, 2 
+    li $a2, 3 
+    li $a3, 4 
+    jal draw_line
+    
+    # 3. Bottom bar (x0, y4, len 3, H)
+    addi $a0, $s1, 0 
+    addi $a1, $s2, 4 
+    li $a2, 3 
+    li $a3, 4 
+    jal draw_line
+    
+    # 4. Right bar (Full 5 length) (x2, y0, len 5, V)
+    addi $a0, $s1, 2 
+    addi $a1, $s2, 0 
+    li $a2, 5 
+    li $a3, 128 
+    jal draw_line
+    
+    j draw_digit_end
+
+# --- Draw 4 Logic (3x5) ---
+draw_4:
+    # 4: Left (Top Mid), Mid, Right (5)
+    
+    # 1. Left bar (Top Half) (x0, y0, len 3, V)
+    addi $a0, $s1, 0 
+    addi $a1, $s2, 0 
+    li $a2, 3 
+    li $a3, 128 
+    jal draw_line
+    
+    # 2. Middle bar (x0, y2, len 3, H)
+    addi $a0, $s1, 0 
+    addi $a1, $s2, 2 
+    li $a2, 3 
+    li $a3, 4 
+    jal draw_line
+    
+    # 3. Right bar (Full 5 length) (x2, y0, len 5, V)
+    addi $a0, $s1, 2 
+    addi $a1, $s2, 0 
+    li $a2, 5 
+    li $a3, 128 
+    jal draw_line
+    
+    j draw_digit_end
+
+# --- Draw 5 Logic (3x5) ---
+draw_5:
+    # 5: Top, Left(Top), Mid, Right(Bottom), Bottom
+    
+    # 1. Top bar (x0, y0, len 3, H)
+    addi $a0, $s1, 0 
+    addi $a1, $s2, 0 
+    li $a2, 3 
+    li $a3, 4 
+    jal draw_line
+    
+    # 2. Left side (Top Half) (x0, y0, len 3, V)
+    addi $a0, $s1, 0 
+    addi $a1, $s2, 0 
+    li $a2, 3 
+    li $a3, 128 
+    jal draw_line
+    
+    # 3. Middle bar (x0, y2, len 3, H)
+    addi $a0, $s1, 0 
+    addi $a1, $s2, 2 
+    li $a2, 3 
+    li $a3, 4 
+    jal draw_line
+    
+    # 4. Right side (Bottom Half) (x2, y2, len 3, V)
+    addi $a0, $s1, 2 
+    addi $a1, $s2, 2 
+    li $a2, 3 
+    li $a3, 128 
+    jal draw_line
+    
+    # 5. Bottom bar (x0, y4, len 3, H)
+    addi $a0, $s1, 0 
+    addi $a1, $s2, 4 
+    li $a2, 3 
+    li $a3, 4 
+    jal draw_line
+    
+    j draw_digit_end
+
+# --- Draw 6 Logic (3x5) ---
+draw_6:
+    # 6: Top, Left (5), Mid, Bottom, Right (Bottom Half)
+    
+    # 1. Top bar (x0, y0, len 3, H)
+    addi $a0, $s1, 0 
+    addi $a1, $s2, 0 
+    li $a2, 3 
+    li $a3, 4 
+    jal draw_line
+    
+    # 2. Left bar (Full 5 length) (x0, y0, len 5, V)
+    addi $a0, $s1, 0 
+    addi $a1, $s2, 0 
+    li $a2, 5 
+    li $a3, 128 
+    jal draw_line
+    
+    # 3. Middle bar (x0, y2, len 3, H)
+    addi $a0, $s1, 0 
+    addi $a1, $s2, 2 
+    li $a2, 3 
+    li $a3, 4 
+    jal draw_line
+    
+    # 4. Right side (Bottom Half) (x2, y2, len 3, V)
+    addi $a0, $s1, 2 
+    addi $a1, $s2, 2 
+    li $a2, 3 
+    li $a3, 128 
+    jal draw_line
+    
+    # 5. Bottom bar (x0, y4, len 3, H)
+    addi $a0, $s1, 0 
+    addi $a1, $s2, 4 
+    li $a2, 3 
+    li $a3, 4 
+    jal draw_line
+    
+    j draw_digit_end
+
+# --- Draw 7 Logic (3x5) ---
+draw_7:
+    # 7: Top, Right (5)
+    
+    # 1. Top bar (x0, y0, len 3, H)
+    addi $a0, $s1, 0 
+    addi $a1, $s2, 0 
+    li $a2, 3 
+    li $a3, 4 
+    jal draw_line
+    
+    # 2. Right bar (Full 5 length) (x2, y0, len 5, V)
+    addi $a0, $s1, 2 
+    addi $a1, $s2, 0 
+    li $a2, 5 
+    li $a3, 128 
+    jal draw_line
+    
+    j draw_digit_end
+
+# --- Draw 8 Logic (3x5) ---
+draw_8:
+    # 8: Top, Mid, Bottom, Left (5), Right (5)
+    
+    # 1. Top bar (x0, y0, len 3, H)
+    addi $a0, $s1, 0 
+    addi $a1, $s2, 0 
+    li $a2, 3 
+    li $a3, 4 
+    jal draw_line
+    
+    # 2. Middle bar (x0, y2, len 3, H)
+    addi $a0, $s1, 0 
+    addi $a1, $s2, 2 
+    li $a2, 3 
+    li $a3, 4 
+    jal draw_line
+    
+    # 3. Bottom bar (x0, y4, len 3, H)
+    addi $a0, $s1, 0 
+    addi $a1, $s2, 4 
+    li $a2, 3 
+    li $a3, 4 
+    jal draw_line
+    
+    # 4. Left bar (Full 5 length) (x0, y0, len 5, V)
+    addi $a0, $s1, 0 
+    addi $a1, $s2, 0 
+    li $a2, 5 
+    li $a3, 128 
+    jal draw_line
+    
+    # 5. Right bar (Full 5 length) (x2, y0, len 5, V)
+    addi $a0, $s1, 2 
+    addi $a1, $s2, 0 
+    li $a2, 5 
+    li $a3, 128 
+    jal draw_line
+    
+    j draw_digit_end
+
+# --- Draw 9 Logic (3x5) ---
+draw_9:
+    # 9: Top, Mid, Bottom, Left(Top Half), Right (5)
+    
+    # 1. Top bar (x0, y0, len 3, H)
+    addi $a0, $s1, 0  
+    addi $a1, $s2, 0  
+    li $a2, 3  
+    li $a3, 4  
+    jal draw_line
+    
+    # 2. Middle bar (x0, y2, len 3, H)
+    addi $a0, $s1, 0  
+    addi $a1, $s2, 2  
+    li $a2, 3  
+    li $a3, 4  
+    jal draw_line
+    
+    # 3. Bottom bar (x0, y4, len 3, H)
+    addi $a0, $s1, 0  
+    addi $a1, $s2, 4  
+    li $a2, 3  
+    li $a3, 4  
+    jal draw_line
+    
+    # 4. Left side (Top Half) (x0, y0, len 3, V)
+    addi $a0, $s1, 0  
+    addi $a1, $s2, 0  
+    li $a2, 3  
+    li $a3, 128  
+    jal draw_line
+    
+    # 5. Right bar (Full 5 length) (x2, y0, len 5, V)
+    addi $a0, $s1, 2  
+    addi $a1, $s2, 0  
+    li $a2, 5  
+    li $a3, 128  
+    jal draw_line
+
+    j draw_digit_end
+
+draw_digit_end:
+    # Restore registers and return
+    lw $ra, 0($sp)
+    lw $s1, 4($sp)
+    lw $s2, 8($sp)
+    lw $s3, 12($sp)
+    lw $t1, 16($sp)
+    addi $sp, $sp, 20
+    jr $ra
+
+
 display_game_over:
     addi $sp, $sp, -4
     sw $ra, 0($sp)
@@ -1218,22 +1692,22 @@ draw_retry:
     ############################################################
     # ======== R (x=13, y=6)
     ############################################################
-    li $a0,7
+    li $a0,0
     li $a1,8
     li $a2,5
     li $a3,128
     jal draw_line    # vertical
-    li $a0,8
+    li $a0,1
     li $a1,8
     li $a2,1
     li $a3,4
     jal draw_line    # top
-    li $a0,8
+    li $a0,1
     li $a1,10
     li $a2,1
     li $a3,4
     jal draw_line    # mid
-    li $a0,9
+    li $a0,2
     li $a1,9
     li $a2,1
     li $a3,4
@@ -1243,7 +1717,7 @@ draw_retry:
     # li $a2,1
     # li $a3,4
     # jal draw_line    # lower angled stub
-    li $a0,9
+    li $a0,2
     li $a1,11
     li $a2,2
     li $a3,128
@@ -1252,34 +1726,34 @@ draw_retry:
     ############################################################
     # ======== E (x=13, y=0) ========
     ############################################################
-    li $a0,11
+    li $a0,4
     li $a1,8
     li $a2,5
     li $a3,128
     jal draw_line    # vertical
-    li $a0,11
+    li $a0,4
     li $a1,8
     li $a2,3
     li $a3,4
     jal draw_line    # top
-    li $a0,11
+    li $a0,4
     li $a1,10
     li $a2,2
     li $a3,4
     jal draw_line    # mid
-    li $a0,11
+    li $a0,4
     li $a1,12
     li $a2,3
     li $a3,4
     jal draw_line    # bottom
     
     # T
-    li $a0,16
+    li $a0,9
     li $a1,8
     li $a2,5
     li $a3,128
     jal draw_line    # vertical
-    li $a0,15
+    li $a0,8
     li $a1,8
     li $a2,3
     li $a3,4
@@ -1288,22 +1762,22 @@ draw_retry:
     ############################################################
     # ======== R (x=13, y=6)
     ############################################################
-    li $a0,19
+    li $a0,12
     li $a1,8
     li $a2,5
     li $a3,128
     jal draw_line    # vertical
-    li $a0,20
+    li $a0,13
     li $a1,8
     li $a2,1
     li $a3,4
     jal draw_line    # top
-    li $a0,20
+    li $a0,13
     li $a1,10
     li $a2,1
     li $a3,4
     jal draw_line    # mid
-    li $a0,21
+    li $a0,14
     li $a1,9
     li $a2,1
     li $a3,4
@@ -1313,24 +1787,24 @@ draw_retry:
     # li $a2,1
     # li $a3,4
     # jal draw_line    # lower angled stub
-    li $a0,21
+    li $a0,14
     li $a1,11
     li $a2,2
     li $a3,128
     jal draw_line    # right mid pixel
     
     # Y
-    li $a0,23
+    li $a0,16
     li $a1,8
     li $a2,2
     li $a3,128
     jal draw_line    # vertical
-    li $a0,25
+    li $a0,18
     li $a1,8
     li $a2,2
     li $a3,128
     jal draw_line    # vertical
-    li $a0,24
+    li $a0,17
     li $a1,10
     li $a2,3
     li $a3,128
