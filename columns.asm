@@ -192,6 +192,7 @@ keyboard_input:
     beq $a0, 0x64, respond_to_D     # Check if the key a was pressed
     beq $a0, 0x73, respond_to_S     # Check if the key s was pressed
     beq $a0, 0x77, respond_to_W     # Check if the key w was pressed
+    beq $a0, 0x65, respond_to_E     # Check if the key e was pressed
 
 keyboard_input_end:
     j game_loop
@@ -789,10 +790,89 @@ respond_to_W:
     
 
 respond_to_E:
-    addi $sp, $sp, -4
+    addi $sp, $sp, -16
     sw   $ra, 0($sp)
+    sw   $s1, 4($sp)
+    sw   $s2, 8($sp)
+    sw   $s3, 12($sp)
 
-    addi $sp, $sp, 4
+    lw $s1, ADDR_CAPSULE_X
+    lw $s2, ADDR_CAPSULE_Y
+    la $s3, ADDR_CAPSULE_COLORS
+
+    # erase the block at current location (x, y)
+    li $t1, 0 # set color to black
+    move $a0, $s1 # x
+    move $a1, $s2 # bottom y
+    addi $a1, $a1, -2  # top y
+    li $a2, 5         # length = 3
+    li $a3, 128         # vertical offset
+    jal draw_line
+
+    # if there is no saved, save the current capsule and do new_capsule
+    # 1) get saved bottom gem color
+    li $a0, 13 # x of saved
+    li $a1, 14 # y of saved
+    jal get_from_board # the color is saved in $v0
+    # 2) get gem color + apply saved color to gem color
+    lw $t1, 0($s3)
+    sw $v0, 0($s3)
+    # 3) apply the current color to saved location
+    li   $a0, 13    # x of saved
+    li   $a1, 14    # y of saved
+    move   $a2, $t1   # bottom gem color
+    jal add_to_board
+
+    # MID GEM
+    # 1) get saved bottom gem color
+    li $a0, 13 # x of saved
+    li $a1, 13 # y of saved
+    jal get_from_board # the color is saved in $v0
+    # 2) get gem color + apply saved color to gem color
+    lw $t1, 4($s3)
+    sw $v0, 4($s3)
+    # 3) apply the current color to saved location
+    li   $a0, 13    # x of saved
+    li   $a1, 13    # y of saved
+    move   $a2, $t1   # bottom gem color
+    jal add_to_board
+
+    # TOP GEM
+    # 1) get saved bottom gem color
+    li $a0, 13 # x of saved
+    li $a1, 12 # y of saved
+    jal get_from_board # the color is saved in $v0
+    # 2) get gem color + apply saved color to gem color
+    lw $t1, 8($s3)
+    sw $v0, 8($s3)
+    # 3) apply the current color to saved location
+    li   $a0, 13    # x of saved
+    li   $a1, 12    # y of saved
+    move   $a2, $t1   # bottom gem color
+    jal add_to_board
+
+    # if the swapped color is black - do new_capsule
+    lw $t0, 0($s3)
+    bne $t0, $zero, reset_capsule_location
+    jal new_capsule
+    
+reset_capsule_location:
+    # reset the capsule location to (6, 3)
+    la $t0, ADDR_CAPSULE_X
+    li $t1, 6
+    sw $t1, 0($t0)
+    la $t0, ADDR_CAPSULE_Y
+    li $t1, 3
+    sw $t1, 0($t0)
+
+    # do draw capsule
+    jal draw_capsule
+
+    lw $ra, 0($sp)
+    lw $s1, 4($sp)
+    lw $s2, 8($sp)
+    lw $s3, 12($sp)
+    addi $sp, $sp, 16
     jr   $ra
 # no args needed. returns the hexcode in $v0
 # candidates: [ADDR_COLORS, ADDR_COLORS + 6)
