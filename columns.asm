@@ -66,7 +66,10 @@ SPEED:
     .word 60 # frame needed to auto-drop 1 tick
 
 SCORE:
-    .word 000
+    .word 0
+
+HIGHEST_SCORE:
+    .word 0
 
 ##############################################################################
 # Mutable Data
@@ -90,7 +93,12 @@ main:
     jal draw_stage
     jal new_capsule
     jal draw_capsule
+
+    la $t0, SCORE
+    sw $zero, 0($t0)
+    
     jal draw_score
+    jal draw_highest_score
 
     # Play game
     j game_loop
@@ -131,6 +139,12 @@ game_over:
     li $a0, 400 
     syscall
     jal cascade
+    
+    lw $t0, HIGHEST_SCORE
+    lw $t1, SCORE
+    bge $t0, $t1, game_over_loop
+    la $t2, HIGHEST_SCORE
+    sw $t1, 0($t2)
 game_over_loop:
     jal display_game_over
     
@@ -774,6 +788,12 @@ respond_to_W:
     jr   $ra
     
 
+respond_to_E:
+    addi $sp, $sp, -4
+    sw   $ra, 0($sp)
+
+    addi $sp, $sp, 4
+    jr   $ra
 # no args needed. returns the hexcode in $v0
 # candidates: [ADDR_COLORS, ADDR_COLORS + 6)
 get_random_gem_color:
@@ -940,7 +960,7 @@ draw_stage:
     
     li $a0, 0
     li $a1, 15
-    li $a2, 12
+    li $a2, 16
     li $a3, 4
     jal draw_line # draw bottom stage : 0,15 to 8,15 
     
@@ -952,6 +972,18 @@ draw_stage:
     
     li $a0, 12
     li $a1, 4
+    li $a2, 4
+    li $a3, 4
+    jal draw_line # draw box for next block
+
+    li $a0, 15
+    li $a1, 11
+    li $a2, 4
+    li $a3, 128
+    jal draw_line # draw box for next block
+    
+    li $a0, 12
+    li $a1, 11
     li $a2, 4
     li $a3, 4
     jal draw_line # draw box for next block
@@ -1020,6 +1052,66 @@ draw_p:
     lw $ra, 0($sp)
     addi $sp, $sp, 4
     jr $ra 
+
+
+# draw_highest_score function: Displays the current score (0-999) in the bottom-left corner.
+draw_highest_score:
+    # Save necessary registers on the stack
+    addi $sp, $sp, -16
+    sw $ra, 0($sp)  # Save $ra
+    sw $s1, 4($sp)   # Save $s1 (color)
+    sw $s2, 8($sp)   # Save $s2 (start X coordinate)
+    sw $s3, 12($sp)  # Save $s3 (score)
+
+    lw $s3, HIGHEST_SCORE
+    la $t1, 0xFF0000    # **Set $t1 with the color**, as required by draw_line.
+
+    # Set Scoreboard starting position (Bottom-Left)
+    li $t6, 1       # $t6 = start_y (Y coordinate is fixed for 3x5 digits: 16 - 5 = 11)
+    li $s2, 20        # $s2 = current_x (Start X coordinate)
+
+    # 1. Calculate and Draw the HUNDREDS Digit
+    li $t0, 100      
+    div $t2, $s3, $t0 # $t2 = Hundreds digit 
+    mul $t3, $t2, $t0 
+    sub $s3, $s3, $t3 # $s3 = Remaining score (0-99)
+
+    # Call draw_digit (Hundreds place)
+    move $a0, $t2    # $a0 = digit (0-9)
+    move $a1, $s2    # $a1 = x_start
+    move $a2, $t6    # $a2 = y_start
+    jal draw_digit
+    addi $s2, $s2, 4 # Update X coordinate: 3 (width) + 1 (spacing) = 4
+
+    # 2. Calculate and Draw the TENS Digit
+    li $t0, 10       
+    div $t2, $s3, $t0 # $t2 = Tens digit
+    mul $t3, $t2, $t0 
+    sub $s3, $s3, $t3 # $s3 = Remaining score (0-9)
+
+    # Call draw_digit (Tens place)
+    move $a0, $t2    
+    move $a1, $s2    
+    move $a2, $t6    
+    jal draw_digit
+    addi $s2, $s2, 4 # Update X coordinate
+
+    # 3. Draw the ones digit
+    move $t2, $s3    # $t2 = Ones digit
+
+    # Call draw_digit (Ones place)
+    move $a0, $t2    
+    move $a1, $s2    
+    move $a2, $t6    
+    jal draw_digit
+
+    # Restore registers and return
+    lw $ra, 0($sp)
+    lw $s1, 4($sp)
+    lw $s2, 8($sp)
+    lw $s3, 12($sp)
+    addi $sp, $sp, 16
+    jr $ra
 
 
 # draw_score function: Displays the current score (0-999) in the bottom-left corner.
